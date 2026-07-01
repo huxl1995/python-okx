@@ -23,7 +23,7 @@ def _load_env_once():
         return
     
     _env_loaded = True
-    env_path = Path(__file__).parent.parent / '.env'
+    env_path = Path(__file__).parent.parent.parent / '.env'
     
     try:
         from dotenv import load_dotenv

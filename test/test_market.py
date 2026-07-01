@@ -19,8 +19,6 @@ class MarketAPITest(unittest.TestCase):
     def setUp(self):
         api_key, api_secret_key, passphrase, flag = get_api_credentials()
         self.MarketApi = MarketData.MarketAPI(api_key, api_secret_key, passphrase, use_server_time=False, flag=flag)
-    '''
-    
     def test_index_component(self):
         print(self.MarketApi.get_index_components("BTC-USDT"))
     def test_exchange_rate(self):
@@ -55,7 +53,6 @@ class MarketAPITest(unittest.TestCase):
         print(self.MarketApi.get_history_trades('BTC-USDT'))
     def test_get_platform_24_volume(self):
         print(self.MarketApi.get_volume())
-    '''
 
     # def test_get_order_lite_book(self):
     #     print(self.MarketApi.get_order_lite_book(instId='BTC-USDT'))
