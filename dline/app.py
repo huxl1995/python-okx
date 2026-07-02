@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from dline.dline import DLinearForStock, StockDataset
+from dlineModel import DLinearForStock, StockDataset
 
 
 def load_model(path, seq_len=30, pred_len=5, num_features=4, map_location=None):
