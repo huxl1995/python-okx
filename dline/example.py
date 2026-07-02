@@ -1,5 +1,5 @@
 import torch
-from Dline import *
+from dline.dline import *
 from data import *
 def loadData(path):
     return np.loadtxt(path, delimiter=",", skiprows=1,dtype=np.float64)
