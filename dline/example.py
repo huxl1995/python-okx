@@ -1,15 +1,20 @@
+import pandas as pd
 import torch
 from dline import *
 from data import *
 from app import *
-from zscore import *
+from stand import *
 def loadData(path):
     return np.loadtxt(path, delimiter=",", skiprows=1,dtype=np.float64)
 if __name__=="__main__":
     oriPath="all.csv"
     dstPath="data1.csv"
     data=pandaLoadData(oriPath)
-    rollingStand(data,30,'open')
+    data['date']=pd.to_datetime(data['date'])
+    rollingZScoreStand(data,30,'open')
+    CSNStand(data,Type.MONTH,'date')
+    CSNStand(data,Type.DAY,'date')
+
     print(data)
 
 
