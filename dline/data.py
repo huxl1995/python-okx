@@ -37,3 +37,5 @@ def convertData(oriPath,dstPath):
     data = np.loadtxt(oriPath, delimiter=",", skiprows=1,dtype=np.str_)
     print(data[3:7])
     np.savetxt(dstPath,data[:,3:7],delimiter=",",fmt="%s")
+def pandaLoadData(path):
+    return pd.read_csv(path)

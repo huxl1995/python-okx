@@ -2,24 +2,37 @@ import torch
 from dline import *
 from data import *
 from app import *
+from zscore import *
 def loadData(path):
     return np.loadtxt(path, delimiter=",", skiprows=1,dtype=np.float64)
 if __name__=="__main__":
     oriPath="all.csv"
     dstPath="data1.csv"
-    convertData(oriPath,dstPath)
-    data=loadData(dstPath)
-    # 设定窗口参数
-    SEQ_LEN = 30  # 用过去 30 天的数据
-    PRED_LEN = 5  # 预测未来 5 天
-    num_features=4
-    trainData=data[:1505]
-    testData=data[1505:]
-    # train_and_save(data=trainData,save_path="./model.pt",seq_len=SEQ_LEN,pred_len=PRED_LEN,epochs=10)
-    model=load_model("./model.pt")
-    testData=testData[0:30]
-    res=predict(testData,model)
-    print(res)
+    data=pandaLoadData(oriPath)
+    rollingStand(data,30,'open')
+    print(data)
+
+
+
+    #
+    # convertData(oriPath,dstPath)
+    # data=loadData(dstPath)
+    # # 设定窗口参数
+    # SEQ_LEN = 30  # 用过去 30 天的数据
+    # PRED_LEN = 5  # 预测未来 5 天
+    # num_features=4
+    # trainData=data[:1505]
+    # testData=data[1505:]
+    # # train_and_save(data=trainData,save_path="./model.pt",seq_len=SEQ_LEN,pred_len=PRED_LEN,epochs=10)
+    # model=load_model("./model.pt")
+    # testData=testData[0:30]
+    # res=predict(testData,model)
+    # print(res)
+
+
+
+
+
     # train_dataset = StockDataset(trainData, SEQ_LEN, PRED_LEN)
     # train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     # # 1. 实例化模型、损失函数和优化器
