@@ -7,18 +7,18 @@ class Type(Enum):
     HOUR = 3
 def rollingZScoreStand(df, windowSize, key):
     # 3. 计算滚动的均值和标准差 (注意：closed='left' 严格防止时间穿越，即今天的数据不参与今天均值的计算)
-    df["Rolling_Mean"] = (
+    df[key+"Rolling_Mean"] = (
         df[key].rolling(window=windowSize, closed="left").mean()
     )
-    df["Rolling_Std"] = df[key].rolling(window=windowSize, closed="left").std()
+    df[key+"Rolling_Std"] = df[key].rolling(window=windowSize, closed="left").std()
 
     # 4. 执行滚动 Z-Score 计算
     # 加 1e-8 防止复牌或横盘时标准差为 0 导致除以 0 报错
-    df[key+"Scaled"] = (df[key] - df["Rolling_Mean"]) / (
-            df["Rolling_Std"] + 1e-8
+    df[key+"Scaled"] = (df[key] - df[key+"Rolling_Mean"]) / (
+            df[key+"Rolling_Std"] + 1e-8
     )
-    df.drop("Rolling_Mean",axis=1,inplace=True)
-    df.drop("Rolling_Std",axis=1,inplace=True)
+    df.drop(key+"Rolling_Mean",axis=1,inplace=True)
+    df.drop(key+"Rolling_Std",axis=1,inplace=True)
     return df
 def CSNStand(data,type,key):
     if type == Type.MONTH:
@@ -43,6 +43,20 @@ def CSNStand(data,type,key):
             data.loc[i,key + "HourCos"] = np.cos(2 * np.pi * dataItem.hour / 5.0)
         i+=1
     return data
+def LOGZSCOREStand(data,windowSize,key):
+    data[key+"Log"]=np.log1p(data[key])
+    data=rollingZScoreStand(data,windowSize,key+"Log")
+    data.drop(key+"Log",axis=1,inplace=True)
+    return data
+def returnOriValue(data,windowSize,key,standValue):
+    data.loc[len(data)]=0
+    df[key+"Rolling_Mean"] = (
+        df[key].rolling(window=windowSize, closed="left").mean()
+    )
+    df[key+"Rolling_Std"] = df[key].rolling(window=windowSize, closed="left").std()
+    return standValue*df[key+"Rolling_Std"][-1]+df[key+"Rolling_Mean"][-1]
+
+
 if __name__=='__main__':
     # 1. 模拟单只股票 100 天的价格数据 (从 100元 涨到 250元 左右)
     np.random.seed(42)

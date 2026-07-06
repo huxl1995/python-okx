@@ -14,7 +14,7 @@ if __name__=="__main__":
     rollingZScoreStand(data,30,'open')
     CSNStand(data,Type.MONTH,'date')
     CSNStand(data,Type.DAY,'date')
-
+    LOGZSCOREStand(data,30,'volume')
     print(data)
 
 
