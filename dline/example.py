@@ -18,7 +18,9 @@ if __name__=="__main__":
     CSNStand(data,Type.MONTH,'date')
     CSNStand(data,Type.DAY,'date')
     LOGZSCOREStand(data,30,'volume')
+    data=data[:][30:]
     print(data)
+    datanp=data[['openScaled','highScaled','lowScaled','closeScaled','dateMonthSin','dateMonthCos','dateDaySin','dateDayCos','volumeLogScaled']].to_numpy()
 
 
 
@@ -26,16 +28,16 @@ if __name__=="__main__":
     # convertData(oriPath,dstPath)
     # data=loadData(dstPath)
     # # 设定窗口参数
-    # SEQ_LEN = 30  # 用过去 30 天的数据
-    # PRED_LEN = 5  # 预测未来 5 天
-    # num_features=4
-    # trainData=data[:1505]
-    # testData=data[1505:]
-    # # train_and_save(data=trainData,save_path="./model.pt",seq_len=SEQ_LEN,pred_len=PRED_LEN,epochs=10)
-    # model=load_model("./model.pt")
-    # testData=testData[0:30]
-    # res=predict(testData,model)
-    # print(res)
+    SEQ_LEN = 30  # 用过去 30 天的数据
+    PRED_LEN = 5  # 预测未来 5 天
+    num_features=4
+    trainData=datanp[:1490]
+    testData=datanp[1490:1490+30]
+    train_and_save(data=trainData,save_path="./model.pt",seq_len=SEQ_LEN,pred_len=PRED_LEN,epochs=20)
+    model=load_model("./model.pt")
+    testData=testData[0:30]
+    res=predict(testData,model)
+    print(res)
 
 
 

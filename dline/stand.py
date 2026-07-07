@@ -1,3 +1,5 @@
+from unittest.mock import inplace
+
 import numpy as np
 import pandas as pd
 from enum import Enum
@@ -54,7 +56,9 @@ def returnOriValue(data,windowSize,key,standValue):
         df[key].rolling(window=windowSize, closed="left").mean()
     )
     df[key+"Rolling_Std"] = df[key].rolling(window=windowSize, closed="left").std()
-    return standValue*df[key+"Rolling_Std"][-1]+df[key+"Rolling_Mean"][-1]
+    oriValue= standValue*df[key+"Rolling_Std"][-1]+df[key+"Rolling_Mean"][-1]
+    data.drop(data.index[-1],inplace=True)
+    return oriValue
 
 
 if __name__=='__main__':
