@@ -11,14 +11,16 @@ if __name__=="__main__":
     dstPath="data1.csv"
     data=pandaLoadData(oriPath)
     data['date']=pd.to_datetime(data['date'])
-    rollingZScoreStand(data,30,'open')
-    rollingZScoreStand(data,30,'high')
-    rollingZScoreStand(data,30,'low')
-    rollingZScoreStand(data,30,'close')
+    windowSize=30
+    rollingZScoreStand(data,windowSize,'open')
+    rollingZScoreStand(data,windowSize,'high')
+    rollingZScoreStand(data,windowSize,'low')
+    rollingZScoreStand(data,windowSize,'close')
     CSNStand(data,Type.MONTH,'date')
     CSNStand(data,Type.DAY,'date')
-    LOGZSCOREStand(data,30,'volume')
-    data=data[:][30:]
+    LOGZSCOREStand(data,windowSize,'volume')
+    rawData=data.copy()
+    data=data[:][windowSize:]
     print(data)
     datanp=data[['openScaled','highScaled','lowScaled','closeScaled','dateMonthSin','dateMonthCos','dateDaySin','dateDayCos','volumeLogScaled']].to_numpy()
 
@@ -32,12 +34,18 @@ if __name__=="__main__":
     PRED_LEN = 5  # 预测未来 5 天
     num_features=4
     trainData=datanp[:1490]
-    testData=datanp[1490:1490+30]
+    testStartTrimmedIndex=1490
+    testData=datanp[testStartTrimmedIndex:testStartTrimmedIndex+SEQ_LEN]
     train_and_save(data=trainData,save_path="./model.pt",seq_len=SEQ_LEN,pred_len=PRED_LEN,epochs=20)
     model=load_model("./model.pt")
-    testData=testData[0:30]
+    testData=testData[0:SEQ_LEN]
     res=predict(testData,model)
-    print(res)
+    print("标准化空间预测结果:", res)
+    startIndex=testStartTrimmedIndex+SEQ_LEN+windowSize
+    restored=restorePredictions(res, rawData, windowSize, startIndex)
+    print("还原后的 open:", restored["open"])
+    print("还原后的 close:", restored["close"])
+    print("还原后的 volume:", restored["volume"])
 
 
 
