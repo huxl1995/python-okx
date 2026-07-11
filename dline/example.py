@@ -22,7 +22,8 @@ if __name__=="__main__":
     data=data[:][windowSize:]
     rawData=data.copy()
     print(data)
-    datanp=data[['openScaled','highScaled','lowScaled','closeScaled','dateMonthSin','dateMonthCos','dateDaySin','dateDayCos','volCcyQuoteLogScaled']].to_numpy()
+    # datanp=data[['openScaled','highScaled','lowScaled','closeScaled','dateMonthSin','dateMonthCos','dateDaySin','dateDayCos','volCcyQuoteLogScaled']].to_numpy()
+    datanp=data[['openScaled']].to_numpy()
 
 
 
@@ -30,7 +31,7 @@ if __name__=="__main__":
     # convertData(oriPath,dstPath)
     # data=loadData(dstPath)
     # # 设定窗口参数
-    SEQ_LEN = 30  # 用过去 30 天的数据
+    SEQ_LEN = 96  # 用过去 30 天的数据
     PRED_LEN = 5  # 预测未来 5 天
     trainData=datanp[:len(datanp)-SEQ_LEN-PRED_LEN]
     testStartTrimmedIndex=len(datanp)-SEQ_LEN-PRED_LEN
@@ -47,15 +48,15 @@ if __name__=="__main__":
     priceKeys={"open":0,"high":1,"low":2,"close":3}
     restored=restorePredictions(res, rawData, windowSize, startIndex,priceKeys=priceKeys)
     print("还原后的 open:", restored["open"])
-    print("还原后的 high:", restored["high"])
-    print("还原后的 low:", restored["low"])
-    print("还原后的 close:", restored["close"])
+    # print("还原后的 high:", restored["high"])
+    # print("还原后的 low:", restored["low"])
+    # print("还原后的 close:", restored["close"])
 
     restored=restorePredictions(trueData, rawData, windowSize, startIndex,priceKeys=priceKeys)
     print("真实还原后的 open:", restored["open"])
-    print("真实还原后的 high:", restored["high"])
-    print("真实还原后的 low:", restored["low"])
-    print("真实还原后的 close:", restored["close"])
+    # print("真实还原后的 high:", restored["high"])
+    # print("真实还原后的 low:", restored["low"])
+    # print("真实还原后的 close:", restored["close"])
 
 
 
