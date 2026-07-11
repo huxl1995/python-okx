@@ -12,6 +12,8 @@ import akshare as ak
 import baostock as bs
 import pandas as pd
 import numpy as np
+from pandas.core.interchange.dataframe_protocol import DataFrame
+
 
 def download(path):
     # 登陆系统
@@ -39,3 +41,9 @@ def convertData(oriPath,dstPath):
     np.savetxt(dstPath,data[:,3:7],delimiter=",",fmt="%s")
 def pandaLoadData(path):
     return pd.read_csv(path)
+def namedHistoryCandleSticks(data):
+    data.columns=["index","ts","open","high","low","close","vol","volCcy","volCcyQuote","comfirm","null"]
+    return data
+def getEffectiveHistoryCandleSticks(data):
+    data['date']=pd.to_datetime(data['ts'],unit='ms')
+    return data[["date","open","high","low","close","volCcyQuote"]]

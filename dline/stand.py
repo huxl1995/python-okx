@@ -75,9 +75,7 @@ def restorePredictions(
     rawDf: pd.DataFrame,
     windowSize: int,
     startIndex: int,
-    priceKeys: dict[str,int] | None = None,
-    volumeKey: str | None = "volume",
-    volumeFeatureIndex: int | None = 8,
+    priceKeys: dict[str,int] | None = None
 ) -> dict[str, np.ndarray]:
     """
     将模型预测结果从标准化空间还原为原始价格/成交量。
@@ -97,13 +95,7 @@ def restorePredictions(
     """
     predLen = predictions.shape[0]
     extended = {key: rawDf[key].tolist() for key in priceKeys}
-    if volumeKey is not None:
-        extended[volumeKey] = rawDf[volumeKey].tolist()
-
     result: dict[str, np.ndarray] = {key: np.zeros(predLen) for key in priceKeys}
-    if volumeKey is not None:
-        result[volumeKey] = np.zeros(predLen)
-
     for day in range(predLen):
         index = startIndex + day
         for key, featIdx in priceKeys.items():
@@ -111,14 +103,6 @@ def restorePredictions(
             oriValue = inverseRollingZScore(predictions[day, featIdx], series, windowSize, index)
             result[key][day] = oriValue
             extended[key].append(oriValue)
-        if volumeKey is not None and volumeFeatureIndex is not None:
-            volumeSeries = pd.Series(extended[volumeKey])
-            oriVolume = inverseLogRollingZScore(
-                predictions[day, volumeFeatureIndex], volumeSeries, windowSize, index
-            )
-            result[volumeKey][day] = oriVolume
-            extended[volumeKey].append(oriVolume)
-
     return result
 
 def returnOriValue(data, windowSize, key, standValue):
