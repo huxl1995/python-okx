@@ -44,6 +44,8 @@ if __name__=="__main__":
     startIndex=testStartTrimmedIndex+SEQ_LEN+windowSize
     restored=restorePredictions(res, rawData, windowSize, startIndex)
     print("还原后的 open:", restored["open"])
+    print("还原后的 high:", restored["high"])
+    print("还原后的 low:", restored["low"])
     print("还原后的 close:", restored["close"])
     print("还原后的 volume:", restored["volume"])
 
