@@ -75,8 +75,7 @@ def restorePredictions(
     rawDf: pd.DataFrame,
     windowSize: int,
     startIndex: int,
-    priceKeys: list[str] | None = None,
-    priceFeatureIndices: list[int] | None = None,
+    priceKeys: dict[str,int] | None = None,
     volumeKey: str | None = "volume",
     volumeFeatureIndex: int | None = 8,
 ) -> dict[str, np.ndarray]:
@@ -96,11 +95,6 @@ def restorePredictions(
     Returns:
         包含还原后 priceKeys 及 volume（如有）数组的字典，各数组形状 (pred_len,)
     """
-    if priceKeys is None:
-        priceKeys = ["open", "high", "low", "close"]
-    if priceFeatureIndices is None:
-        priceFeatureIndices = list(range(len(priceKeys)))
-
     predLen = predictions.shape[0]
     extended = {key: rawDf[key].tolist() for key in priceKeys}
     if volumeKey is not None:
@@ -112,7 +106,7 @@ def restorePredictions(
 
     for day in range(predLen):
         index = startIndex + day
-        for key, featIdx in zip(priceKeys, priceFeatureIndices):
+        for key, featIdx in priceKeys.items():
             series = pd.Series(extended[key])
             oriValue = inverseRollingZScore(predictions[day, featIdx], series, windowSize, index)
             result[key][day] = oriValue

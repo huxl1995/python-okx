@@ -42,7 +42,8 @@ if __name__=="__main__":
     res=predict(testData,model)
     print("标准化空间预测结果:", res)
     startIndex=testStartTrimmedIndex+SEQ_LEN+windowSize
-    restored=restorePredictions(res, rawData, windowSize, startIndex)
+    priceKeys={"open":0,"high":1,"low":2,"close":3}
+    restored=restorePredictions(res, rawData, windowSize, startIndex,priceKeys=priceKeys)
     print("还原后的 open:", restored["open"])
     print("还原后的 high:", restored["high"])
     print("还原后的 low:", restored["low"])
