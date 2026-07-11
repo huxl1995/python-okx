@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
+from dline.myDlineModel import MyDLinearForStock
 from dlineModel import DLinearForStock, StockDataset
 
 

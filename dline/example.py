@@ -7,9 +7,10 @@ from stand import *
 def loadData(path):
     return np.loadtxt(path, delimiter=",", skiprows=1,dtype=np.float64)
 if __name__=="__main__":
-    oriPath="../test/BTC-USDT.txt"
+    oriPath="BTC-USDT.txt"
     data=namedHistoryCandleSticks(pd.read_csv(oriPath))
     data=getEffectiveHistoryCandleSticks(data)
+    data.to_csv('BTC_USDT.csv',header=True)
     windowSize=30
     rollingZScoreStand(data,windowSize,'open')
     rollingZScoreStand(data,windowSize,'high')
@@ -31,7 +32,7 @@ if __name__=="__main__":
     # # 设定窗口参数
     SEQ_LEN = 30  # 用过去 30 天的数据
     PRED_LEN = 5  # 预测未来 5 天
-    trainData=datanp[30000:len(datanp)-SEQ_LEN-PRED_LEN]
+    trainData=datanp[:len(datanp)-SEQ_LEN-PRED_LEN]
     testStartTrimmedIndex=len(datanp)-SEQ_LEN-PRED_LEN
     rawData=rawData[:][:len(rawData)-5]
     testData=datanp[testStartTrimmedIndex:testStartTrimmedIndex+SEQ_LEN]
