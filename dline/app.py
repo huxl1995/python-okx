@@ -74,7 +74,7 @@ def train_and_save(
     pred_len=5,
     epochs=10,
     batch_size=32,
-    lr=0.001,
+    lr=5e-5,
 ):
     """
     训练 DLinearForStock 模型并保存到文件。

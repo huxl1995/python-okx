@@ -8,7 +8,9 @@ from dline.util import subtract_months
 from okx import Account
 from okx.MarketData import MarketAPI
 from datetime import datetime
-
+from dline.data import *
+import matplotlib.pyplot as plt
+import numpy as np
 ms_timestamp = 1719163560000  # 毫秒级时间戳
 dt_obj = datetime.fromtimestamp(ms_timestamp / 1000)
 print(dt_obj.strftime("%Y-%m-%d %H:%M:%S"))
@@ -53,3 +55,25 @@ def testHistory():
     data=namedHistoryCandleSticks(pd.read_csv(oriPath))
     data=getEffectiveHistoryCandleSticks(data)
     data.to_csv('BTC_USDT.csv',header=True)
+def testPic():
+    oriPath="BTC_USDT.csv"
+    data=pandaLoadData(oriPath)
+    data["closeRolling_Mean"] = (
+        data['close'].rolling(window=30, closed="left").mean()
+    )
+    data.drop(data.index[0:30])
+    for i in range(0,len(data)):
+        if data['close'][i]>2*data['closeRolling_Mean'][i] or data['close'][i]<0.5*data['closeRolling_Mean'][i]:
+            data.drop(index=i,inplace=True)
+    data.reset_index(drop=True)
+    s = data['close']
+    t = data.index
+    fig, ax = plt.subplots()
+    ax.plot(t, s)
+
+    ax.set(xlabel='time (s)', ylabel='voltage (mV)',
+           title='About as simple as it gets, folks')
+    ax.grid()
+
+    fig.savefig("test.png")
+    plt.show()

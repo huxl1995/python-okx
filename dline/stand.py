@@ -2,6 +2,10 @@
 import numpy as np
 import pandas as pd
 from enum import Enum
+
+from dline.data import removeOverRecord
+
+
 class Type(Enum):
     MONTH = 1
     DAY = 2
@@ -17,7 +21,7 @@ def rollingZScoreStand(df, windowSize, key):
         df[key].rolling(window=windowSize, closed="left").mean()
     )
     df[key+"Rolling_Std"] = df[key].rolling(window=windowSize, closed="left").std()
-
+    removeOverRecord(df,key)
     # 4. 执行滚动 Z-Score 计算
     # 加 1e-8 防止复牌或横盘时标准差为 0 导致除以 0 报错
     df[key+"Scaled"] = (df[key] - df[key+"Rolling_Mean"]) / (

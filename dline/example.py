@@ -7,10 +7,10 @@ from stand import *
 def loadData(path):
     return np.loadtxt(path, delimiter=",", skiprows=1,dtype=np.float64)
 if __name__=="__main__":
-    oriPath="BTC-USDT.txt"
-    data=namedHistoryCandleSticks(pd.read_csv(oriPath))
-    data=getEffectiveHistoryCandleSticks(data)
-    data.to_csv('BTC_USDT.csv',header=True)
+    oriPath="all.csv"
+    dstPath="data1.csv"
+    data=pandaLoadData(oriPath)
+    data['date']=pd.to_datetime(data['date'])
     windowSize=30
     rollingZScoreStand(data,windowSize,'open')
     rollingZScoreStand(data,windowSize,'high')
@@ -18,47 +18,38 @@ if __name__=="__main__":
     rollingZScoreStand(data,windowSize,'close')
     CSNStand(data,Type.MONTH,'date')
     CSNStand(data,Type.DAY,'date')
-    LOGZSCOREStand(data,windowSize,'volCcyQuote')
-    data=data[:][windowSize:]
+    LOGZSCOREStand(data,windowSize,'volume')
     rawData=data.copy()
+    data.drop(data.index[0:30],inplace=True)
+    data.reset_index(drop=True)
+    # removeOverRecord(data,'open')
+    # removeOverRecord(data,'high')
+    # removeOverRecord(data,'low')
+    # removeOverRecord(data,'close')
     print(data)
-    # datanp=data[['openScaled','highScaled','lowScaled','closeScaled','dateMonthSin','dateMonthCos','dateDaySin','dateDayCos','volCcyQuoteLogScaled']].to_numpy()
-    datanp=data[['openScaled']].to_numpy()
-
-
-
+    datanp=data[['openScaled','highScaled','lowScaled','closeScaled','dateMonthSin','dateMonthCos','dateDaySin','dateDayCos','volumeLogScaled']].to_numpy()
     #
     # convertData(oriPath,dstPath)
     # data=loadData(dstPath)
     # # 设定窗口参数
-    SEQ_LEN = 96  # 用过去 30 天的数据
+    SEQ_LEN = 30  # 用过去 30 天的数据
     PRED_LEN = 5  # 预测未来 5 天
-    trainData=datanp[:len(datanp)-SEQ_LEN-PRED_LEN]
-    testStartTrimmedIndex=len(datanp)-SEQ_LEN-PRED_LEN
-    rawData=rawData[:][:len(rawData)-5]
+    num_features=4
+    trainData=datanp[:1490]
+    testStartTrimmedIndex=1490
     testData=datanp[testStartTrimmedIndex:testStartTrimmedIndex+SEQ_LEN]
-    trueData=datanp[testStartTrimmedIndex+SEQ_LEN:testStartTrimmedIndex+SEQ_LEN+SEQ_LEN]
     train_and_save(data=trainData,save_path="./model.pt",seq_len=SEQ_LEN,pred_len=PRED_LEN,epochs=50)
     model=load_model("./model.pt")
     testData=testData[0:SEQ_LEN]
     res=predict(testData,model)
-    print("实际标准化空间数据:",trueData)
     print("标准化空间预测结果:", res)
-    startIndex=len(rawData)-4
+    startIndex=testStartTrimmedIndex+SEQ_LEN+windowSize
     priceKeys={"open":0,"high":1,"low":2,"close":3}
     restored=restorePredictions(res, rawData, windowSize, startIndex,priceKeys=priceKeys)
     print("还原后的 open:", restored["open"])
-    # print("还原后的 high:", restored["high"])
-    # print("还原后的 low:", restored["low"])
-    # print("还原后的 close:", restored["close"])
-
-    restored=restorePredictions(trueData, rawData, windowSize, startIndex,priceKeys=priceKeys)
-    print("真实还原后的 open:", restored["open"])
-    # print("真实还原后的 high:", restored["high"])
-    # print("真实还原后的 low:", restored["low"])
-    # print("真实还原后的 close:", restored["close"])
-
-
+    print("还原后的 high:", restored["high"])
+    print("还原后的 low:", restored["low"])
+    print("还原后的 close:", restored["close"])
 
 
 
