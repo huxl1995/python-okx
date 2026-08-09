@@ -1,21 +1,13 @@
 import os
 
-import akshare as ak
-
-# 获取贵州茅台（600519）的历史行情数据
-# # adjust='hfq' 表示后复权，'' 则为不复权
-# stock_hfq_df = ak.stock_zh_a_hist(symbol="600519", period="daily", start_date="20250201", end_date="20260601", adjust="hfq")
-# print(stock_hfq_df.head())
-
-
-
-import baostock as bs
 import pandas as pd
 import numpy as np
 from pandas.core.interchange.dataframe_protocol import DataFrame
 
 
 def download(path):
+    import baostock as bs
+
     # 登陆系统
     lg = bs.login()
 

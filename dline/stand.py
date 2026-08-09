@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from enum import Enum
 
-from dline.data import removeOverRecord
+from data import removeOverRecord
 
 
 class Type(Enum):
@@ -79,7 +79,7 @@ def restorePredictions(
     rawDf: pd.DataFrame,
     windowSize: int,
     startIndex: int,
-    priceKeys: dict[str,int] | None = None
+    priceKeys: dict = None
 ) -> dict[str, np.ndarray]:
     """
     将模型预测结果从标准化空间还原为原始价格/成交量。
