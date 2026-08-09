@@ -38,3 +38,4 @@ id_rsa*
 .env
 .env.local
 .env.*.local
+*.pt
