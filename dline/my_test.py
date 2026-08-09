@@ -4,6 +4,7 @@ from dateutil.relativedelta import relativedelta
 import pandas as pd
 from dline.config import get_api_credentials
 from dline.data import namedHistoryCandleSticks, getEffectiveHistoryCandleSticks
+from dline.stand import rollingZScoreStand
 from dline.util import subtract_months
 from okx import Account
 from okx.MarketData import MarketAPI
@@ -77,3 +78,17 @@ def testPic():
 
     fig.savefig("test.png")
     plt.show()
+def testReturnOriValue():
+    oriPath="BTC_USDT.csv"
+    data=pandaLoadData(oriPath)
+    rollingZScoreStand(data,30,'close')
+    data["closeRolling_Mean"] = (
+        data['close'].rolling(window=30, closed="left").mean()
+    )
+    data["closeRolling_Std"] = data["close"].rolling(window=30, closed="left").std()
+    print("calculate value is ",data['closeScaled'][50]*(data['closeRolling_Std'][50]+1e-8)+data['closeRolling_Mean'][50])
+    print("actual value is ",data['close'][50])
+    data.drop(data.index[0:30],inplace=True)
+    data.reset_index(inplace=True)
+    print("1")
+

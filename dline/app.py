@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -132,3 +133,20 @@ def train_and_save(
     )
     model.eval()
     return model
+def calculate(data,model,windowSize):
+    preData=data[len(data)-windowSize:-1]
+    preDataNp=preData[['openScaled','highScaled','lowScaled','closeScaled','dateMonthSin','dateMonthCos','dateDaySin','dateDayCos','volumeLogScaled']].to_numpy()
+    preResultNp=predict(preDataNp,model)
+    df=pd.DataFrame(preResultNp,columns=['openScaled','highScaled','lowScaled','closeScaled'])
+    dataRes=pd.concat(data,df)
+    return dataRes
+
+def rollMeanAndStd(data,key,windowSize):
+    data[key+'RollingMean']=data[key].rolling(window=windowSize,closed='left').mean()
+    data[key+'RollingStd']=data[key].rolling(window=windowSize,closed='left').std()
+def fillActualValue(data,key,num,windowSize):
+    for i in range(num):
+        rollMeanAndStd(data, key, windowSize)
+        data[key][len(data)-num+i]=data[key+'Scaled'][len(data)-num+i]*(data[key+'RollingStd'][len(data)-num+i]+ 1e-8)+data[key+'RollingMean'][len(data)-num+i]
+    return data
+
