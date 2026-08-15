@@ -62,11 +62,11 @@ class FeedbackOptimizer:
         for record in records:
             if record.evaluated or record.action == "HOLD":
                 continue
-            record.exit_price = current_price
+            # Entry BUY records are evaluated when the position closes.
             if record.action == "BUY":
-                record.realized_return = (current_price - record.entry_price) / record.entry_price
-                record.direction_correct = current_price > record.entry_price
-            elif record.action == "SELL":
+                continue
+            record.exit_price = current_price
+            if record.action == "SELL":
                 record.realized_return = (record.entry_price - current_price) / record.entry_price
                 record.direction_correct = current_price < record.entry_price
             record.evaluated = True
@@ -84,13 +84,13 @@ class FeedbackOptimizer:
         return updated
 
     def _compute_metrics(self, records: list[TradeRecord]) -> tuple[float, float, int]:
-        evaluated = [r for r in records if r.evaluated and r.action != "HOLD"]
-        if not evaluated:
+        closed = [r for r in records if r.realized_return is not None]
+        if not closed:
             return 0.0, 0.0, 0
-        wins = sum(1 for r in evaluated if r.direction_correct)
-        win_rate = wins / len(evaluated)
-        avg_return = sum(r.realized_return or 0 for r in evaluated) / len(evaluated)
-        return win_rate, avg_return, len(evaluated)
+        wins = sum(1 for r in closed if (r.realized_return or 0) > 0)
+        win_rate = wins / len(closed)
+        avg_return = sum(r.realized_return or 0 for r in closed) / len(closed)
+        return win_rate, avg_return, len(closed)
 
     def tune(self) -> TuneResult:
         state = self.store.load_state(self._default_state())

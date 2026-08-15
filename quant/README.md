@@ -22,7 +22,12 @@ quant/
 1. **数据**：从 Binance 拉取 OHLCV K 线，做滚动 Z-Score 标准化 + 时间周期 sin/cos 编码。
 2. **模型**：DLinear（趋势/季节分解 + 线性预测），预测未来 `pred_len` 根 K 线的价格。
 3. **信号**：比较预测收盘价与当前价，涨跌幅超过 `threshold` 则 BUY/SELL，否则 HOLD。
-4. **反馈优化**：
+4. **止损止盈**（现货做多）：
+   - 开仓时根据入场价设置止损价（`-stop_loss%`）和止盈价（`+take_profit%`）；
+   - 每轮循环优先检查当前价是否触发 SL/TP，触发则市价平仓；
+   - 持仓期间模型发出 SELL 信号也会主动平仓；
+   - 空仓时忽略 SELL 信号（现货不做空）。
+5. **反馈优化**：
    - 记录每笔交易及预测方向；
    - 下一周期用实际价格评估盈亏与方向是否正确；
    - 胜率低于目标时提高 threshold、降低学习率；
@@ -84,6 +89,9 @@ pip install -r quant/requirements.txt
 | `--interval` | 1h | K 线周期 |
 | `--quantity` | 0.01 | 每笔数量 |
 | `--threshold` | 0.001 | 触发买卖的最小预期涨跌幅 |
+| `--stop-loss` | 0.02 | 止损比例（2%） |
+| `--take-profit` | 0.03 | 止盈比例（3%） |
+| `--no-sl-tp` | - | 关闭止损止盈 |
 | `--epochs` | 50 | 每轮训练 epoch 数 |
 | `--cycles` | 0 | 循环次数，0 为无限 |
 | `--dry-run` | - | 模拟下单 |
@@ -93,8 +101,9 @@ pip install -r quant/requirements.txt
 
 运行后会在 `quant/data_store/` 生成：
 
-- `trades.jsonl` — 交易记录
+- `trades.jsonl` — 交易记录（含 `reason`: SIGNAL / STOP_LOSS / TAKE_PROFIT / SIGNAL_EXIT）
 - `optimizer_state.json` — 优化器状态（threshold、lr、胜率等）
+- `position.json` — 当前持仓及 SL/TP 价位
 
 模型保存在 `quant/models/{SYMBOL}_{INTERVAL}_model.pt`。
 

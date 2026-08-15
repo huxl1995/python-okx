@@ -44,6 +44,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-path", default=None)
     parser.add_argument("--quantity", default="0.01")
     parser.add_argument("--threshold", type=float, default=0.001)
+    parser.add_argument("--stop-loss", type=float, default=0.02, help="Stop-loss ratio, e.g. 0.02 = 2%%")
+    parser.add_argument("--take-profit", type=float, default=0.03, help="Take-profit ratio, e.g. 0.03 = 3%%")
+    parser.add_argument("--no-sl-tp", action="store_true", help="Disable stop-loss / take-profit")
     parser.add_argument("--sleep", type=int, default=None)
     parser.add_argument("--cycles", type=int, default=0, help="0 = infinite")
     parser.add_argument("--dry-run", action="store_true", help="Simulate orders")
@@ -80,6 +83,9 @@ def main() -> None:
             {
                 "quantity": args.quantity,
                 "signal_threshold": args.threshold,
+                "stop_loss_pct": args.stop_loss,
+                "take_profit_pct": args.take_profit,
+                "enable_sl_tp": not args.no_sl_tp,
                 "sleep_seconds": args.sleep,
                 "max_cycles": args.cycles,
                 "dry_run": dry_run,

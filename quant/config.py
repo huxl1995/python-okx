@@ -44,6 +44,9 @@ class QuantConfig:
 
     # Strategy
     signal_threshold: float = 0.001
+    stop_loss_pct: float = 0.02
+    take_profit_pct: float = 0.03
+    enable_sl_tp: bool = True
 
     # Optimizer
     min_trades_for_tune: int = 5
@@ -79,6 +82,10 @@ class QuantConfig:
     @property
     def state_path(self) -> Path:
         return self.data_dir / "optimizer_state.json"
+
+    @property
+    def position_path(self) -> Path:
+        return self.data_dir / "position.json"
 
     def interval_seconds(self) -> int:
         mapping = {

@@ -19,9 +19,12 @@ class TradeRecord:
     action: str
     quantity: str
     entry_price: float
-    predicted_price: float
-    expected_return: float
-    threshold: float
+    predicted_price: float = 0.0
+    expected_return: float = 0.0
+    threshold: float = 0.0
+    reason: str = "SIGNAL"
+    stop_loss_price: Optional[float] = None
+    take_profit_price: Optional[float] = None
     timestamp: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -29,6 +32,20 @@ class TradeRecord:
     realized_return: Optional[float] = None
     direction_correct: Optional[bool] = None
     evaluated: bool = False
+
+
+@dataclass
+class Position:
+    symbol: str
+    side: str
+    entry_price: float
+    quantity: str
+    stop_loss_price: float
+    take_profit_price: float
+    entry_cycle_id: int
+    entry_time: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
 
 
 @dataclass
@@ -46,9 +63,10 @@ class OptimizerState:
 class TradeStore:
     """Append-only JSONL trade log with evaluation support."""
 
-    def __init__(self, log_path: Path, state_path: Path) -> None:
+    def __init__(self, log_path: Path, state_path: Path, position_path: Path | None = None) -> None:
         self.log_path = log_path
         self.state_path = state_path
+        self.position_path = position_path
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
 
     def append(self, record: TradeRecord) -> None:
@@ -87,3 +105,25 @@ class TradeStore:
     def pending_evaluations(self) -> list[tuple[int, TradeRecord]]:
         records = self.load_all()
         return [(i, r) for i, r in enumerate(records) if not r.evaluated and r.action != "HOLD"]
+
+    def load_position(self) -> Position | None:
+        if self.position_path is None or not self.position_path.exists():
+            return None
+        data = json.loads(self.position_path.read_text(encoding="utf-8"))
+        if not data or "symbol" not in data:
+            return None
+        return Position(**data)
+
+    def save_position(self, position: Position | None) -> None:
+        if self.position_path is None:
+            return
+        if position is None:
+            self.position_path.write_text("{}", encoding="utf-8")
+        else:
+            self.position_path.write_text(
+                json.dumps(asdict(position), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+
+    def clear_position(self) -> None:
+        self.save_position(None)

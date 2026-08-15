@@ -2,7 +2,7 @@
   "signal_threshold": 0.001,
   "lr": 5e-05,
   "epochs": 5,
-  "total_trades": 0,
+  "total_trades": 1,
   "evaluated_trades": 0,
   "win_rate": 0.0,
   "avg_return": 0.0,
