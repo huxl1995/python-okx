@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
 from quant.config import load_config
 from quant.engine.runner import TradingEngine
 from quant.model.predictor import PricePredictor
+from quant.model.registry import available_models
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,9 +30,16 @@ def build_parser() -> argparse.ArgumentParser:
         "command",
         nargs="?",
         default="run",
-        choices=("run", "train", "predict"),
+        choices=("run", "train", "predict", "models"),
         help="Command (default: run)",
     )
+    parser.add_argument(
+        "--model",
+        default="dlinear",
+        choices=available_models(),
+        help="Forecast model type (default: dlinear)",
+    )
+    parser.add_argument("--hidden-size", type=int, default=64, help="Hidden size for lstm/mlp")
     parser.add_argument("--symbol", default="BNBUSDT")
     parser.add_argument("--interval", default="1h")
     parser.add_argument("--limit", type=int, default=1000)
@@ -66,6 +74,8 @@ def main() -> None:
     overrides = {
         "symbol": args.symbol,
         "interval": args.interval,
+        "model_type": args.model,
+        "hidden_size": args.hidden_size,
         "kline_limit": args.limit,
         "window_size": args.window_size,
         "seq_len": args.seq_len,
@@ -91,6 +101,13 @@ def main() -> None:
                 "dry_run": dry_run,
             }
         )
+
+    if command == "models":
+        print("Available forecast models:")
+        for name in available_models():
+            marker = " (default)" if name == "dlinear" else ""
+            print(f"  - {name}{marker}")
+        return
 
     cfg = load_config(**overrides)
     if args.model_path:

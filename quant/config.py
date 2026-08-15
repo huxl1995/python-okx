@@ -34,6 +34,8 @@ class QuantConfig:
     dry_run: bool = True
 
     # Model
+    model_type: str = "dlinear"
+    hidden_size: int = 64
     kline_limit: int = 1000
     window_size: int = 30
     seq_len: int = 30
@@ -73,7 +75,7 @@ class QuantConfig:
     def model_path(self) -> Path:
         if self._model_path_override is not None:
             return self._model_path_override
-        return self.model_dir / f"{self.symbol}_{self.interval}_model.pt"
+        return self.model_dir / f"{self.symbol}_{self.interval}_{self.model_type}_model.pt"
 
     @property
     def trade_log_path(self) -> Path:

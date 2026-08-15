@@ -7,17 +7,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 
 from quant.config import QuantConfig
 from quant.data.features import FEATURE_COLUMNS, PRICE_KEYS, preprocess_klines, restore_predictions
 from quant.data.klines import KlineFetcher
-from quant.model.dlinear import DLinearModel
 from quant.model.trainer import load_model, train_and_save
 
 logger = logging.getLogger(__name__)
 
 
-def predict_scaled(model: DLinearModel, window: np.ndarray) -> np.ndarray:
+def predict_scaled(model: nn.Module, window: np.ndarray) -> np.ndarray:
     tensor = torch.tensor(window, dtype=torch.float32)
     if tensor.dim() == 2:
         tensor = tensor.unsqueeze(0)
@@ -52,15 +52,16 @@ class PricePredictor:
     def train(self, epochs: int | None = None, lr: float | None = None) -> Path:
         _, _, matrix = self._prepare_data()
         train_data = matrix[: -self.config.seq_len]
-        logger.info("Training on %s samples", len(train_data))
         train_and_save(
             data=train_data,
             save_path=self.config.model_path,
+            model_type=self.config.model_type,
             seq_len=self.config.seq_len,
             pred_len=self.config.pred_len,
             epochs=epochs or self.config.epochs,
             batch_size=self.config.batch_size,
             lr=lr or self.config.lr,
+            hidden_size=self.config.hidden_size,
         )
         return self.config.model_path
 
@@ -70,7 +71,13 @@ class PricePredictor:
             raise ValueError("Not enough rows for inference window")
 
         input_window = matrix[-self.config.seq_len :]
-        model = load_model(self.config.model_path)
+        model = load_model(
+            self.config.model_path,
+            model_type=self.config.model_type,
+            seq_len=self.config.seq_len,
+            pred_len=self.config.pred_len,
+            hidden_size=self.config.hidden_size,
+        )
         scaled_pred = predict_scaled(model, input_window)
         restored = restore_predictions(
             scaled_pred,
@@ -78,6 +85,11 @@ class PricePredictor:
             self.config.window_size,
             len(raw_df),
             price_keys=PRICE_KEYS,
+        )
+        logger.info(
+            "Prediction model=%s steps=%s",
+            self.config.model_type,
+            self.config.pred_len,
         )
         for i in range(self.config.pred_len):
             logger.info(

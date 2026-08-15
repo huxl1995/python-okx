@@ -9,30 +9,35 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from quant.model.dlinear import DLinearModel, SequenceDataset
+from quant.model.base import SequenceDataset
+from quant.model.registry import build_model
 
 logger = logging.getLogger(__name__)
 
 
 def load_model(
     path: str | Path,
+    model_type: str = "dlinear",
     seq_len: int = 30,
     pred_len: int = 5,
     num_features: int = 11,
+    hidden_size: int = 64,
     map_location: str | None = None,
-) -> DLinearModel:
+) -> nn.Module:
     device = map_location or "cpu"
     checkpoint = torch.load(path, map_location=device, weights_only=False)
 
     if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
         state_dict = checkpoint["state_dict"]
+        model_type = checkpoint.get("model_type", model_type)
         seq_len = checkpoint.get("seq_len", seq_len)
         pred_len = checkpoint.get("pred_len", pred_len)
         num_features = checkpoint.get("num_features", num_features)
+        hidden_size = checkpoint.get("hidden_size", hidden_size)
     else:
         state_dict = checkpoint
 
-    model = DLinearModel(seq_len=seq_len, pred_len=pred_len, num_features=num_features)
+    model = build_model(model_type, seq_len, pred_len, num_features, hidden_size)
     model.load_state_dict(state_dict)
     model.eval()
     return model
@@ -41,12 +46,14 @@ def load_model(
 def train_and_save(
     data: np.ndarray,
     save_path: str | Path,
+    model_type: str = "dlinear",
     seq_len: int = 30,
     pred_len: int = 5,
     epochs: int = 50,
     batch_size: int = 32,
     lr: float = 5e-5,
-) -> DLinearModel:
+    hidden_size: int = 64,
+) -> nn.Module:
     if data.ndim != 2:
         raise ValueError("Training data must be 2D (samples, features)")
     if len(data) < seq_len + pred_len:
@@ -56,9 +63,18 @@ def train_and_save(
     dataset = SequenceDataset(data, seq_len, pred_len)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    model = DLinearModel(seq_len=seq_len, pred_len=pred_len, num_features=num_features)
+    model = build_model(model_type, seq_len, pred_len, num_features, hidden_size)
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    logger.info(
+        "Training model=%s samples=%s seq_len=%s pred_len=%s features=%s",
+        model_type,
+        len(data),
+        seq_len,
+        pred_len,
+        num_features,
+    )
 
     model.train()
     for epoch in range(epochs):
@@ -78,9 +94,11 @@ def train_and_save(
     torch.save(
         {
             "state_dict": model.state_dict(),
+            "model_type": model_type,
             "seq_len": seq_len,
             "pred_len": pred_len,
             "num_features": num_features,
+            "hidden_size": hidden_size,
         },
         save_path,
     )
