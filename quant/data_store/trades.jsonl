@@ -1,0 +1,1 @@
+{"cycle_id": 1, "symbol": "BNBUSDT", "interval": "1h", "action": "BUY", "quantity": "0.01", "entry_price": 611.0, "predicted_price": 613.1088256835938, "expected_return": 0.003451433197371113, "threshold": 0.001, "timestamp": "2026-08-15T08:37:20.055407+00:00", "exit_price": null, "realized_return": null, "direction_correct": null, "evaluated": false}

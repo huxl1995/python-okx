@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""
+Binance quantitative trading CLI.
+
+Examples (from project root):
+    ./venv/bin/python -m quant.main --dry-run
+    ./venv/bin/python -m quant.main --symbol BNBUSDT --interval 1h --cycles 1
+    ./venv/bin/python -m quant.main train --symbol BTCUSDT
+"""
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from quant.config import load_config
+from quant.engine.runner import TradingEngine
+from quant.model.predictor import PricePredictor
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Binance quant trading system")
+    parser.add_argument(
+        "command",
+        nargs="?",
+        default="run",
+        choices=("run", "train", "predict"),
+        help="Command (default: run)",
+    )
+    parser.add_argument("--symbol", default="BNBUSDT")
+    parser.add_argument("--interval", default="1h")
+    parser.add_argument("--limit", type=int, default=1000)
+    parser.add_argument("--window-size", type=int, default=30)
+    parser.add_argument("--seq-len", type=int, default=30)
+    parser.add_argument("--pred-len", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--lr", type=float, default=5e-5)
+    parser.add_argument("--model-path", default=None)
+    parser.add_argument("--quantity", default="0.01")
+    parser.add_argument("--threshold", type=float, default=0.001)
+    parser.add_argument("--sleep", type=int, default=None)
+    parser.add_argument("--cycles", type=int, default=0, help="0 = infinite")
+    parser.add_argument("--dry-run", action="store_true", help="Simulate orders")
+    parser.add_argument("--live", action="store_true", help="Place real orders")
+    return parser
+
+
+def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
+    args = build_parser().parse_args()
+    command = args.command
+
+    overrides = {
+        "symbol": args.symbol,
+        "interval": args.interval,
+        "kline_limit": args.limit,
+        "window_size": args.window_size,
+        "seq_len": args.seq_len,
+        "pred_len": args.pred_len,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "lr": args.lr,
+    }
+
+    if command == "run":
+        dry_run = not args.live
+        if args.dry_run:
+            dry_run = True
+        overrides.update(
+            {
+                "quantity": args.quantity,
+                "signal_threshold": args.threshold,
+                "sleep_seconds": args.sleep,
+                "max_cycles": args.cycles,
+                "dry_run": dry_run,
+            }
+        )
+
+    cfg = load_config(**overrides)
+    if args.model_path:
+        cfg._model_path_override = Path(args.model_path)
+
+    if command == "train":
+        PricePredictor(cfg).train()
+        return
+
+    if command == "predict":
+        restored = PricePredictor(cfg).predict_future()
+        print("Predicted closes:", restored["close"].tolist())
+        return
+
+    engine = TradingEngine(cfg)
+    if cfg.max_cycles == 1:
+        engine.run_once()
+    else:
+        engine.run_loop()
+
+
+if __name__ == "__main__":
+    main()
