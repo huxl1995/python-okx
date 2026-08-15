@@ -1,0 +1,10 @@
+{
+  "symbol": "BNBUSDT",
+  "side": "LONG",
+  "entry_price": 610.96,
+  "quantity": "0.01",
+  "stop_loss_price": 598.7408,
+  "take_profit_price": 629.2888,
+  "entry_cycle_id": 1,
+  "entry_time": "2026-08-15T08:40:06.331058+00:00"
+}
