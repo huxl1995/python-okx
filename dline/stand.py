@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from enum import Enum
 
-from data import removeOverRecord
+from dline.data import removeOverRecord
 
 
 class Type(Enum):

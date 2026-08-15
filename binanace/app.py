@@ -1,3 +1,5 @@
+import time
+
 from binanace.klines import fetch_klines
 from dline.app import predict, load_model, train_and_save
 from dline.stand import restorePredictions, LOGZSCOREStand, CSNStand, rollingZScoreStand, Type
@@ -14,7 +16,7 @@ FEATURE_COLUMNS = [
 PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 EPOCHS=50
 def predictNext(symbol,interval,window_size,model_path):
-    kline_df = fetch_klines(symbol=symbol, interval=interval, limit=window_size)
+    kline_df = fetch_klines(symbol=symbol, interval=interval, limit=2*window_size)
     raw_data = kline_df.copy()
     kline_df["date"] = pd.to_datetime(kline_df["date"])
     for key in ("open", "high", "low", "close"):
@@ -65,3 +67,11 @@ def train(symbol,interval,window_size,model_path,pre_len):
         pred_len=pre_len,
         epochs=EPOCHS,
     )
+SYMBOL = "BNBUSDT"
+
+if __name__=='__main__':
+    while True:
+        train(SYMBOL,'1h',30,SYMBOL+'model.pt',5)
+        result=predictNext(SYMBOL,'1h',30,SYMBOL+'model.pt')
+        print(f'result is {result}')
+        time.sleep(60)
