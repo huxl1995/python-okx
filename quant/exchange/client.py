@@ -35,7 +35,17 @@ class BinanceTrader:
         if self._dry_run:
             logger.info("[DRY RUN] %s %s quantity=%s", side, symbol, quantity)
             return {"dry_run": True, "side": side, "symbol": symbol, "quantity": quantity}
-
+        balances = self._client.rest_api.get_account(omit_zero_balances=True,recv_window=10000).data().balances
+        is_new_order=False
+        for balance in balances:
+            if balance.asset==symbol:
+                if balance.free<quantity and side=='BUY':
+                    is_new_order=True
+                elif balance.free>=quantity and side!='BUY':
+                    is_new_order=True
+        if not is_new_order:
+            logger.info("[BALANCE IS NOT] %s %s quantity=%s", side, symbol, quantity)
+            return {"dry_run": False, "side": side, "symbol": symbol, "quantity": quantity}
         response = self._client.rest_api.new_order(
             symbol=symbol,
             side=side_enum,
