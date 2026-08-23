@@ -74,13 +74,12 @@ def simBTC(interval):
         pred_len=PRED_LEN,
         epochs=EPOCHS,
     )
-    have=False
     money=0
     num=0
     quant=0
     while end_time<datetime.now():
-        kline_df = fetch_klines(symbol='BTCUSDT', interval='1h', limit=2*WINDOW_SIZE, end_time=int(end_time.timestamp())*1000)
-        raw_data = kline_df.copy()
+        kline_df = fetch_klines(symbol='BTCUSDT', interval='1h', limit=1000, end_time=int(end_time.timestamp()) * 1000)
+        raw_data=kline_df.copy()
         # 2. 特征标准化（与 dline/example.py 相同流程）
         kline_df["date"] = pd.to_datetime(kline_df["date"])
         for key in ("open", "high", "low", "close"):
@@ -95,9 +94,22 @@ def simBTC(interval):
         kline_df.reset_index(drop=True, inplace=True)
 
         data_np = kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
+
+        # 3. 划分训练集与预测输入
+        train_data = data_np
+        # 4. 训练 DLinearForStock 并保存
+        train_and_save(
+            data=train_data,
+            save_path=str(MODEL_PATH),
+            seq_len=SEQ_LEN,
+            pred_len=PRED_LEN,
+            epochs=10,
+            log=False
+        )
+        preData=data_np[-30:]
         # 5. 加载模型并预测
         model = load_model(str(MODEL_PATH))
-        scaled_pred = predict(data_np, model)
+        scaled_pred = predict(preData, model)
 
         # 6. 将预测结果还原为真实 OHLC 价格
         start_index = len(raw_data)  # 预测的是未来数据，从 raw_data 末尾开始
@@ -119,7 +131,8 @@ def simBTC(interval):
                 state="sell"
                 quant-=1
                 money+=kline_df['close'].to_numpy()[-1]
-        print(f"num is {num},state is {state},money is {money},quant is {quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
+        print(f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {state},money is {money},quant is {quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
         end_time=end_time+timedelta(hours=1)
+        num+=1
 if __name__ == "__main__":
     simBTC('1h')

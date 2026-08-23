@@ -75,6 +75,7 @@ def train_and_save(
     epochs=10,
     batch_size=32,
     lr=5e-5,
+    log=True
 ):
     """
     训练 DLinearForStock 模型并保存到文件。
@@ -118,7 +119,7 @@ def train_and_save(
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
-
+    if log:
         print(f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss / len(train_loader):.4f}")
 
     torch.save(
