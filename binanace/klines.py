@@ -36,7 +36,8 @@ def fetch_klines(
     symbol: str = "BNBUSDT",
     interval: str = KlinesIntervalEnum["INTERVAL_1m"].value,
     limit: int = 1000,
-    start_time = None
+    start_time = None,
+    end_time = None,
 ) -> pd.DataFrame:
     """
     从 Binance 获取 K 线数据并转换为标准 DataFrame。
@@ -49,7 +50,8 @@ def fetch_klines(
             symbol=symbol,
             interval=interval,
             limit=limit,
-            start_time=start_time
+            start_time=start_time,
+            end_time=end_time
         )
 
         rate_limits = response.rate_limits

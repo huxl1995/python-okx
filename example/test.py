@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
+from datetime import datetime,timedelta
 ROOT = Path(__file__).resolve().parent.parent
 DLINE_DIR = ROOT / "dline"
 sys.path.insert(0, str(ROOT))
@@ -17,9 +17,8 @@ sys.path.insert(0, str(DLINE_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dline.app import load_model, predict, train_and_save
-from klines import fetch_klines
 from dline.stand import CSNStand, LOGZSCOREStand, Type, restorePredictions, rollingZScoreStand
-
+from binanace.klines import fetch_klines
 # ---------- 参数配置 ----------
 SYMBOL = "BTCUSDT"
 INTERVAL = "1h"       # K 线周期: 1m, 5m, 1h, 1d 等
@@ -39,11 +38,11 @@ FEATURE_COLUMNS = [
 ]
 PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 
-
-if __name__ == "__main__":
+def simBTC(interval):
     # 1. 从 Binance 拉取 K 线
     print(f"拉取 {SYMBOL} {INTERVAL} K 线，limit={LIMIT} ...")
-    kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT)
+    end_time=datetime(2026,1,20,0,0,0)
+    kline_df = fetch_klines(symbol='BTCUSDT', interval='1h', limit=1000,end_time=int(end_time.timestamp())*1000)
     raw_data = kline_df.copy()
     print(kline_df.tail(3))
 
@@ -63,10 +62,9 @@ if __name__ == "__main__":
     data_np = kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
 
     # 3. 划分训练集与预测输入
-    train_data = data_np[:-SEQ_LEN]          # 除最后 SEQ_LEN 条外全部用于训练
-    input_window = data_np[-SEQ_LEN:]        # 最近 SEQ_LEN 条作为模型输入
+    train_data = data_np
 
-    print(f"训练样本数: {len(train_data)}, 输入窗口: {input_window.shape}")
+    print(f"训练样本数: {len(train_data)}, 输入窗口: {train_data.shape}")
 
     # 4. 训练 DLinearForStock 并保存
     train_and_save(
@@ -76,29 +74,52 @@ if __name__ == "__main__":
         pred_len=PRED_LEN,
         epochs=EPOCHS,
     )
+    have=False
+    money=0
+    num=0
+    quant=0
+    while end_time<datetime.now():
+        kline_df = fetch_klines(symbol='BTCUSDT', interval='1h', limit=2*WINDOW_SIZE, end_time=int(end_time.timestamp())*1000)
+        raw_data = kline_df.copy()
+        # 2. 特征标准化（与 dline/example.py 相同流程）
+        kline_df["date"] = pd.to_datetime(kline_df["date"])
+        for key in ("open", "high", "low", "close"):
+            rollingZScoreStand(kline_df, WINDOW_SIZE, key)
+        CSNStand(kline_df, Type.MONTH, "date")
+        CSNStand(kline_df, Type.DAY, "date")
+        CSNStand(kline_df, Type.HOUR, "date")
+        LOGZSCOREStand(kline_df, WINDOW_SIZE, "volume")
 
-    # 5. 加载模型并预测
-    model = load_model(str(MODEL_PATH))
-    scaled_pred = predict(input_window, model)
-    print("\n标准化空间预测结果:")
-    print(scaled_pred)
+        # 前 WINDOW_SIZE 行因滚动窗口不足会产生 NaN，丢弃
+        kline_df.drop(kline_df.index[0:WINDOW_SIZE], inplace=True)
+        kline_df.reset_index(drop=True, inplace=True)
 
-    # 6. 将预测结果还原为真实 OHLC 价格
-    start_index = len(raw_data)  # 预测的是未来数据，从 raw_data 末尾开始
-    restored = restorePredictions(
-        scaled_pred,
-        raw_data,
-        WINDOW_SIZE,
-        start_index,
-        priceKeys=PRICE_KEYS,
-    )
+        data_np = kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
+        # 5. 加载模型并预测
+        model = load_model(str(MODEL_PATH))
+        scaled_pred = predict(data_np, model)
 
-    print(f"\n未来 {PRED_LEN} 根 K 线预测（还原后价格）:")
-    for i in range(PRED_LEN):
-        print(
-            f"  Step {i + 1}: "
-            f"open={restored['open'][i]:.4f}  "
-            f"high={restored['high'][i]:.4f}  "
-            f"low={restored['low'][i]:.4f}  "
-            f"close={restored['close'][i]:.4f}"
+        # 6. 将预测结果还原为真实 OHLC 价格
+        start_index = len(raw_data)  # 预测的是未来数据，从 raw_data 末尾开始
+        restored = restorePredictions(
+            scaled_pred,
+            raw_data,
+            WINDOW_SIZE,
+            start_index,
+            priceKeys=PRICE_KEYS,
         )
+        state="hold"
+        if restored['close'][0]>kline_df['close'].to_numpy()[-1]:
+            if quant<=0:
+                quant+=1
+                state = "buy"
+                money-=kline_df['close'].to_numpy()[-1]
+        else:
+            if quant>0:
+                state="sell"
+                quant-=1
+                money+=kline_df['close'].to_numpy()[-1]
+        print(f"num is {num},state is {state},money is {money},quant is {quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
+        end_time=end_time+timedelta(hours=1)
+if __name__ == "__main__":
+    simBTC('1h')
