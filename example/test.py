@@ -42,7 +42,7 @@ def simBTC(interval):
     # 1. 从 Binance 拉取 K 线
     print(f"拉取 {SYMBOL} {INTERVAL} K 线，limit={LIMIT} ...")
     end_time=datetime(2026,1,20,0,0,0)
-    kline_df = fetch_klines(symbol='BTCUSDT', interval='1h', limit=1000,end_time=int(end_time.timestamp())*1000)
+    kline_df = fetch_klines(symbol='BTCUSDT', interval='1h', limit=500,end_time=int(end_time.timestamp())*1000)
     raw_data = kline_df.copy()
     print(kline_df.tail(3))
 
@@ -78,7 +78,7 @@ def simBTC(interval):
     num=0
     quant=0
     while end_time<datetime.now():
-        kline_df = fetch_klines(symbol='BTCUSDT', interval='1h', limit=1000, end_time=int(end_time.timestamp()) * 1000)
+        kline_df = fetch_klines(symbol='BTCUSDT', interval='1h', limit=500, end_time=int(end_time.timestamp()) * 1000)
         raw_data=kline_df.copy()
         # 2. 特征标准化（与 dline/example.py 相同流程）
         kline_df["date"] = pd.to_datetime(kline_df["date"])
@@ -122,15 +122,23 @@ def simBTC(interval):
         )
         state="hold"
         if restored['close'][0]>kline_df['close'].to_numpy()[-1]:
-            if quant<=0:
+            if quant<0:
+                quant+=2
+                state = "buy"
+                money-=2*kline_df['close'].to_numpy()[-1]
+            elif quant==0:
                 quant+=1
                 state = "buy"
-                money-=kline_df['close'].to_numpy()[-1]
-        else:
+                money -= kline_df['close'].to_numpy()[-1]
+        elif restored['close'][0]<kline_df['close'].to_numpy()[-1]:
             if quant>0:
                 state="sell"
-                quant-=1
-                money+=kline_df['close'].to_numpy()[-1]
+                quant-=2
+                money+=2*kline_df['close'].to_numpy()[-1]
+            elif quant==0:
+                state = "sell"
+                quant -= 1
+                money += kline_df['close'].to_numpy()[-1]
         print(f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {state},money is {money},quant is {quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
         end_time=end_time+timedelta(hours=1)
         num+=1
