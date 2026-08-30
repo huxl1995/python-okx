@@ -28,7 +28,7 @@ SEQ_LEN = 30          # 输入序列长度（用过去 30 根 K 线）
 PRED_LEN = 5          # 预测未来 5 根 K 线
 EPOCHS = 50
 MODEL_PATH = Path(__file__).parent / "model.pt"
-TRADE_FEE_RATE=0.0005
+TRADE_FEE_RATE=0
 FEATURE_COLUMNS = [
     "openScaled", "highScaled", "lowScaled", "closeScaled",
     "dateMonthSin", "dateMonthCos",
@@ -146,6 +146,6 @@ def simBTC():
         money_list.append({"date":end_time,"money":money+quant*kline_df['close'].to_numpy()[-1]})
         num+=1
     money_df=pd.DataFrame(money_list)
-    money_df.to_csv("./money.csv")
+    money_df.to_csv(f"./{LIMIT}_{INTERVAL}_money.csv")
 if __name__ == "__main__":
     simBTC()
