@@ -10,6 +10,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from datetime import datetime,timedelta
+
+from binanace.example import LIMIT
+
 ROOT = Path(__file__).resolve().parent.parent
 DLINE_DIR = ROOT / "dline"
 sys.path.insert(0, str(ROOT))
@@ -22,12 +25,13 @@ from binanace.klines import fetch_klines
 # ---------- 参数配置 ----------
 SYMBOL = "BTCUSDT"
 INTERVAL = "1h"       # K 线周期: 1m, 5m, 1h, 1d 等
-LIMIT = 500          # 拉取条数（Binance 单次最多 1000）
+LIMIT = 300          # 拉取条数（Binance 单次最多 1000）
 WINDOW_SIZE = 30      # 滚动 Z-Score 窗口
 SEQ_LEN = 30          # 输入序列长度（用过去 30 根 K 线）
 PRED_LEN = 5          # 预测未来 5 根 K 线
 EPOCHS = 50
-MODEL_PATH = Path(__file__).parent / "model.pt"
+MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+"model.pt"
+MODEL_PATH = Path(__file__).parent / MODEL_NAME
 TRADE_FEE_RATE=0
 FEATURE_COLUMNS = [
     "openScaled", "highScaled", "lowScaled", "closeScaled",
@@ -146,6 +150,6 @@ def simBTC():
         money_list.append({"date":end_time,"money":money+quant*kline_df['close'].to_numpy()[-1]})
         num+=1
     money_df=pd.DataFrame(money_list)
-    money_df.to_csv(f"./{LIMIT}_{INTERVAL}_money.csv")
+    money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_money.csv")
 if __name__ == "__main__":
     simBTC()
