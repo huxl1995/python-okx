@@ -29,7 +29,7 @@ LIMIT = 150          # 拉取条数（Binance 单次最多 1000）
 SEQ_LEN = 30
 WINDOW_SIZE = SEQ_LEN      # 滚动 Z-Score 窗口# 输入序列长度（用过去 30 根 K 线）
 PRED_LEN = 5          # 预测未来 5 根 K 线
-EPOCHS = 50
+EPOCHS = 5
 PER_EPOCHS=50
 TRADE_FEE_RATE=0.001
 
