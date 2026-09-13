@@ -26,11 +26,11 @@ from binanace.future_klines import fetch_klines
 SYMBOL = "BTCUSDT"
 INTERVAL = "4h"       # K 线周期: 1m, 5m, 1h, 1d 等
 LIMIT = 150          # 拉取条数（Binance 单次最多 1000）
-SEQ_LEN = 30
+SEQ_LEN = 15
 WINDOW_SIZE = SEQ_LEN      # 滚动 Z-Score 窗口# 输入序列长度（用过去 30 根 K 线）
 PRED_LEN = 5          # 预测未来 5 根 K 线
-EPOCHS = 5
-PER_EPOCHS=50
+EPOCHS = 50
+PER_EPOCHS=5
 TRADE_FEE_RATE=0.0005
 LABEL='future'
 MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+LABEL+"_"+"model.pt"
