@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dline.app import load_model, predict, train_and_save
 from dline.stand import CSNStand, LOGZSCOREStand, Type, restorePredictions, rollingZScoreStand
-from binanace.klines import fetch_klines
+from binanace.future_klines import fetch_klines
 # ---------- 参数配置 ----------
 SYMBOL = "BTCUSDT"
 INTERVAL = "4h"       # K 线周期: 1m, 5m, 1h, 1d 等
@@ -31,9 +31,9 @@ WINDOW_SIZE = SEQ_LEN      # 滚动 Z-Score 窗口# 输入序列长度（用过�
 PRED_LEN = 5          # 预测未来 5 根 K 线
 EPOCHS = 5
 PER_EPOCHS=50
-TRADE_FEE_RATE=0.001
-
-MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+"model.pt"
+TRADE_FEE_RATE=0.0005
+LABEL='future'
+MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+LABEL+"_"+"model.pt"
 MODEL_PATH = Path(__file__).parent / MODEL_NAME
 FEATURE_COLUMNS = [
     "openScaled", "highScaled", "lowScaled", "closeScaled",
@@ -47,7 +47,7 @@ PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 def simBTC():
     # 1. 从 Binance 拉取 K 线
     print(f"拉取 {SYMBOL} {INTERVAL} K 线，limit={LIMIT} ...")
-    end_time=datetime(2026,1,20,0,0,0)
+    end_time=datetime(2025,1,20,0,0,0)
     kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT,end_time=int(end_time.timestamp())*1000)
     raw_data = kline_df.copy()
     print(kline_df.tail(3))
@@ -142,7 +142,7 @@ def simBTC():
         money_list.append({"date":end_time,"money":money+quant*kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*kline_df['close'].to_numpy()[-1]})
         num+=1
     money_df=pd.DataFrame(money_list)
-    money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_money.csv")
+    money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_money.csv")
 def state(restored,quant,close_price):
     min_close=min(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
     max_close=max(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
