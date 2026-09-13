@@ -26,8 +26,8 @@ from binanace.klines import fetch_klines
 SYMBOL = "BTCUSDT"
 INTERVAL = "4h"       # K 线周期: 1m, 5m, 1h, 1d 等
 LIMIT = 150          # 拉取条数（Binance 单次最多 1000）
-WINDOW_SIZE = 15      # 滚动 Z-Score 窗口
-SEQ_LEN = 15          # 输入序列长度（用过去 30 根 K 线）
+SEQ_LEN = 30
+WINDOW_SIZE = SEQ_LEN      # 滚动 Z-Score 窗口# 输入序列长度（用过去 30 根 K 线）
 PRED_LEN = 5          # 预测未来 5 根 K 线
 EPOCHS = 50
 PER_EPOCHS=50
@@ -129,35 +129,34 @@ def simBTC():
             start_index,
             priceKeys=PRICE_KEYS,
         )
-        state="hold"
-        if restored['close'][0]>kline_df['close'].to_numpy()[-1]:
-            if quant<0:
-                quant+=2
-                state = "buy"
-                money-=2*kline_df['close'].to_numpy()[-1]
-                clear_money-=(1+TRADE_FEE_RATE)*2*kline_df['close'].to_numpy()[-1]
-            elif quant==0:
-                quant+=1
-                state = "buy"
-                money -= kline_df['close'].to_numpy()[-1]
-                clear_money -= (1+TRADE_FEE_RATE)*kline_df['close'].to_numpy()[-1]
-        elif restored['close'][0]<kline_df['close'].to_numpy()[-1]:
-            if quant>0:
-                state="sell"
-                quant-=2
-                money+=2*kline_df['close'].to_numpy()[-1]
-                clear_money+=(1-TRADE_FEE_RATE)*2*kline_df['close'].to_numpy()[-1]
-            elif quant==0:
-                state = "sell"
-                quant -= 1
-                money += kline_df['close'].to_numpy()[-1]
-                clear_money += (1-TRADE_FEE_RATE)*kline_df['close'].to_numpy()[-1]
 
+        change_quant=state(restored,quant,kline_df['close'].to_numpy()[-1])
+        quant=quant+change_quant
+        money -= change_quant * kline_df['close'].to_numpy()[-1]
+        if change_quant<=0:
+            clear_money -= change_quant * (1 - TRADE_FEE_RATE) * kline_df['close'].to_numpy()[-1]
+        else:
+            clear_money -= change_quant * (1 + TRADE_FEE_RATE) * kline_df['close'].to_numpy()[-1]
         print(f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {state},money is {money},clear_money is {clear_money},quant is {quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
         end_time=end_time+timedelta(hours=4)
         money_list.append({"date":end_time,"money":money+quant*kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*kline_df['close'].to_numpy()[-1]})
         num+=1
     money_df=pd.DataFrame(money_list)
     money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_money.csv")
+def state(restored,quant,close_price):
+    min_close=min(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
+    max_close=max(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
+    if close_price>=max_close:
+        if quant>=0:
+            return -1
+        else:
+            return 0
+    elif close_price<=min_close:
+        if quant<=0:
+            return 1
+        else:
+            return 0
+    else:
+        return 0
 if __name__ == "__main__":
     simBTC()
