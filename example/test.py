@@ -4,7 +4,6 @@
 运行方式（在项目根目录）:
     ./venv/bin/python binanace/example.py
 """
-import os
 import sys
 from pathlib import Path
 
@@ -13,6 +12,7 @@ import pandas as pd
 from datetime import datetime,timedelta
 
 from binanace.example import LIMIT
+
 ROOT = Path(__file__).resolve().parent.parent
 DLINE_DIR = ROOT / "dline"
 sys.path.insert(0, str(ROOT))
@@ -24,16 +24,16 @@ from dline.stand import CSNStand, LOGZSCOREStand, Type, restorePredictions, roll
 from binanace.klines import fetch_klines
 # ---------- 参数配置 ----------
 SYMBOL = "BTCUSDT"
-INTERVAL = "1h"       # K 线周期: 1m, 5m, 1h, 1d 等
-LIMIT = 300          # 拉取条数（Binance 单次最多 1000）
-WINDOW_SIZE = 30      # 滚动 Z-Score 窗口
-SEQ_LEN = 30          # 输入序列长度（用过去 30 根 K 线）
+INTERVAL = "4h"       # K 线周期: 1m, 5m, 1h, 1d 等
+LIMIT = 150          # 拉取条数（Binance 单次最多 1000）
+WINDOW_SIZE = 15      # 滚动 Z-Score 窗口
+SEQ_LEN = 15          # 输入序列长度（用过去 30 根 K 线）
 PRED_LEN = 5          # 预测未来 5 根 K 线
 EPOCHS = 50
-LABEL="spot"
+PER_EPOCHS=50
 TRADE_FEE_RATE=0.001
 
-MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+LABEL+"_"+str(TRADE_FEE_RATE)+"_model.pt"
+MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+"model.pt"
 MODEL_PATH = Path(__file__).parent / MODEL_NAME
 FEATURE_COLUMNS = [
     "openScaled", "highScaled", "lowScaled", "closeScaled",
@@ -43,10 +43,12 @@ FEATURE_COLUMNS = [
     "volumeLogScaled",
 ]
 PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
-def train_init_mode(end_time):
+
+def simBTC():
     # 1. 从 Binance 拉取 K 线
     print(f"拉取 {SYMBOL} {INTERVAL} K 线，limit={LIMIT} ...")
-    kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(end_time.timestamp()) * 1000)
+    end_time=datetime(2026,1,20,0,0,0)
+    kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT,end_time=int(end_time.timestamp())*1000)
     raw_data = kline_df.copy()
     print(kline_df.tail(3))
 
@@ -78,13 +80,10 @@ def train_init_mode(end_time):
         pred_len=PRED_LEN,
         epochs=EPOCHS,
     )
-def simBTC():
-    end_time = datetime(2026, 1, 20, 0, 0, 0)
-    train_init_mode(end_time)
     money=0
+    clear_money=0
     num=0
     quant=0
-    clear_money=0
     money_list=[]
     money_list.append({"date":end_time,"money":0,"clear_money":0})
     while end_time<datetime.now():
@@ -113,10 +112,10 @@ def simBTC():
             save_path=str(MODEL_PATH),
             seq_len=SEQ_LEN,
             pred_len=PRED_LEN,
-            epochs=10,
+            epochs=PER_EPOCHS,
             log=False
         )
-        preData=data_np[-30:]
+        preData=data_np[-SEQ_LEN:]
         # 5. 加载模型并预测
         model = load_model(str(MODEL_PATH))
         scaled_pred = predict(preData, model)
@@ -153,12 +152,12 @@ def simBTC():
                 quant -= 1
                 money += kline_df['close'].to_numpy()[-1]
                 clear_money += (1-TRADE_FEE_RATE)*kline_df['close'].to_numpy()[-1]
+
         print(f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {state},money is {money},clear_money is {clear_money},quant is {quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
-        end_time=end_time+timedelta(hours=1)
+        end_time=end_time+timedelta(hours=4)
         money_list.append({"date":end_time,"money":money+quant*kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*kline_df['close'].to_numpy()[-1]})
         num+=1
     money_df=pd.DataFrame(money_list)
-    money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{LABEL}_{TRADE_FEE_RATE}_money.csv")
-
+    money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_money.csv")
 if __name__ == "__main__":
     simBTC()
