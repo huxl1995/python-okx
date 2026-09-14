@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dline.app import load_model, predict, train_and_save
 from dline.stand import CSNStand, LOGZSCOREStand, Type, restorePredictions, rollingZScoreStand
-from binanace.future_klines import fetch_klines
+from binanace.future.future_klines import fetch_klines
 # ---------- 参数配置 ----------
 SYMBOL = "BTCUSDT"
 INTERVAL = "4h"       # K 线周期: 1m, 5m, 1h, 1d 等

@@ -1,8 +1,6 @@
-import os
-
 from binance_sdk_spot.spot import Spot, ConfigurationRestAPI
 
-from config import get_binance_api_credentials
+from binanace.config import get_binance_api_credentials
 apiKey,privateKey=get_binance_api_credentials()
 configuration_rest_api = ConfigurationRestAPI(
     private_key=apiKey,
