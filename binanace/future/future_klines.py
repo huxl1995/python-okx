@@ -12,6 +12,9 @@ from binance_sdk_derivatives_trading_usds_futures.derivatives_trading_usds_futur
 from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
     KlineCandlestickDataIntervalEnum,
 )
+
+from binanace.config import get_binanace_restAPI
+
 logging.basicConfig(level=logging.INFO)
 
 KLINES_COLUMNS = [
@@ -28,17 +31,8 @@ KLINES_COLUMNS = [
     "taker_buy_quote",
     "ignore",
 ]
-
-configuration_rest_api = ConfigurationRestAPI(
-    api_key=os.getenv("API_KEY", ""),
-    api_secret=os.getenv("API_SECRET", ""),
-    base_path=os.getenv(
-        "BASE_PATH", DERIVATIVES_TRADING_USDS_FUTURES_REST_API_PROD_URL
-    ),
-)
-
 # Initialize DerivativesTradingUsdsFutures client
-client = DerivativesTradingUsdsFutures(config_rest_api=configuration_rest_api)
+client = DerivativesTradingUsdsFutures(config_rest_api=get_binanace_restAPI())
 
 
 

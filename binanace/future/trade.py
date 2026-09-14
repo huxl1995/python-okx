@@ -21,12 +21,31 @@ logging.basicConfig(level=logging.INFO)
 # Initialize DerivativesTradingUsdsFutures client
 client = DerivativesTradingUsdsFutures(config_rest_api=get_binanace_restAPI())
 
-def new_order(symbol,side,type):
+def new_market_order(symbol,side,quant):
     try:
         response = client.rest_api.new_order(
             symbol=symbol,
             side=NewOrderSideEnum[side].value,
-            type=type,
+            type="MARKET",
+            quantity=quant
+        )
+
+        rate_limits = response.rate_limits
+        logging.info(f"new_order() rate limits: {rate_limits}")
+
+        data = response.data()
+        logging.info(f"new_order() response: {data}")
+    except Exception as e:
+        logging.error(f"new_order() error: {e}")
+def new_limit_order(symbol,side,quant,price):
+    try:
+        response = client.rest_api.new_order(
+            symbol=symbol,
+            side=NewOrderSideEnum[side].value,
+            type="LIMIT",
+            quantity=quant,
+            price=price,
+            time_in_force="GTC"
         )
 
         rate_limits = response.rate_limits
@@ -37,4 +56,6 @@ def new_order(symbol,side,type):
     except Exception as e:
         logging.error(f"new_order() error: {e}")
 if __name__=="__main__":
-    new_order("BTCUSDT","BUY","MARKET")
+    #new_order("BTCUSDT","BUY","MARKET",1)
+    #new_market_order("BTCUSDT","SELL",0.01)
+    new_limit_order("BTCUSDT","SELL",0.01,81000)
