@@ -55,6 +55,20 @@ def new_limit_order(symbol,side,quant,price):
         logging.info(f"new_order() response: {data}")
     except Exception as e:
         logging.error(f"new_order() error: {e}")
+def cancel_all_open_orders(symbol):
+    try:
+        response = client.rest_api.cancel_all_open_orders(
+            symbol=symbol,
+        )
+
+        rate_limits = response.rate_limits
+        logging.info(f"cancel_all_open_orders() rate limits: {rate_limits}")
+
+        data = response.data()
+        logging.info(f"cancel_all_open_orders() response: {data}")
+    except Exception as e:
+        logging.error(f"cancel_all_open_orders() error: {e}")
+
 if __name__=="__main__":
     #new_order("BTCUSDT","BUY","MARKET",1)
     #new_market_order("BTCUSDT","SELL",0.01)
