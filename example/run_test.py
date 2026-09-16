@@ -27,7 +27,7 @@ from dline.stand import CSNStand, LOGZSCOREStand, Type, restorePredictions, roll
 from binanace.future.future_klines import fetch_klines
 # ---------- 参数配置 ----------
 SYMBOL = "BTCUSDT"
-INTERVAL = "4h"       # K 线周期: 1m, 5m, 1h, 1d 等
+INTERVAL = "1m"       # K 线周期: 1m, 5m, 1h, 1d 等
 LIMIT = 150          # 拉取条数（Binance 单次最多 1000）
 SEQ_LEN = 15
 WINDOW_SIZE = SEQ_LEN      # 滚动 Z-Score 窗口# 输入序列长度（用过去 30 根 K 线）
@@ -37,7 +37,8 @@ PER_EPOCHS=5
 TRADE_FEE_RATE=0.0005
 QUANT_RATE=0.01
 LABEL='future'
-MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+LABEL+"_"+"model.pt"
+MODEL_NAME="testmodel.pt"
+
 MODEL_PATH = Path(__file__).parent / MODEL_NAME
 FEATURE_COLUMNS = [
     "openScaled", "highScaled", "lowScaled", "closeScaled",
@@ -153,9 +154,7 @@ def pre_train():
         epochs=EPOCHS,
     )
 if __name__ == "__main__":
-    schedule.every().day.at("00:00").do(dojob)
-    schedule.every().day.at("04:00").do(dojob)
-    schedule.every().day.at("08:00").do(dojob)
-    schedule.every().day.at("12:00").do(dojob)
-    schedule.every().day.at("16:00").do(dojob)
-    schedule.every().day.at("20:00").do(dojob)
+    pre_train()
+    while True:
+        dojob()
+        sleep(60)
