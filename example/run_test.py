@@ -4,6 +4,7 @@
 运行方式（在项目根目录）:
     ./venv/bin/python binanace/example.py
 """
+import random
 import sys
 from pathlib import Path
 from time import sleep
@@ -48,21 +49,10 @@ FEATURE_COLUMNS = [
     "volumeLogScaled",
 ]
 PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
+STATE_LABEL=True
 def state(restored,quant,close_price):
-    min_close=min(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
-    max_close=max(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
-    if close_price>=max_close:
-        if quant>=0:
-            return -1
-        else:
-            return 0
-    elif close_price<=min_close:
-        if quant<=0:
-            return 1
-        else:
-            return 0
-    else:
-        return 0
+    my_list=[1,-1]
+    return random.choice(my_list)
 def dojob():
     kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(datetime.now().timestamp()) * 1000)
     raw_data = kline_df.copy()
@@ -110,7 +100,7 @@ def dojob():
     quant = get_position_amt(SYMBOL)
     change_quant = state(restored, quant, kline_df['close'].to_numpy()[-1])
     if change_quant < 0:
-        new_limit_order(SYMBOL, "SELL", change_quant * QUANT_RATE, kline_df['close'].to_numpy()[-1])
+        new_limit_order(SYMBOL, "SELL", -1*change_quant * QUANT_RATE, kline_df['close'].to_numpy()[-1])
         print(f"do job once, side is SELL")
     elif change_quant > 0:
         new_limit_order(SYMBOL, "BUY", change_quant * QUANT_RATE, kline_df['close'].to_numpy()[-1])

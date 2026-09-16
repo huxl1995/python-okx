@@ -6,7 +6,7 @@
 """
 import sys
 from pathlib import Path
-from time import sleep
+from time import sleep, time
 
 import numpy as np
 import pandas as pd
@@ -109,7 +109,7 @@ def dojob():
     quant = get_position_amt(SYMBOL)
     change_quant = state(restored, quant, kline_df['close'].to_numpy()[-1])
     if change_quant < 0:
-        new_limit_order(SYMBOL, "SELL", change_quant * QUANT_RATE, kline_df['close'].to_numpy()[-1])
+        new_limit_order(SYMBOL, "SELL", -1*change_quant * QUANT_RATE, kline_df['close'].to_numpy()[-1])
         print(f"do job once, side is SELL")
     elif change_quant > 0:
         new_limit_order(SYMBOL, "BUY", change_quant * QUANT_RATE, kline_df['close'].to_numpy()[-1])
@@ -159,3 +159,6 @@ if __name__ == "__main__":
     schedule.every().day.at("12:00").do(dojob)
     schedule.every().day.at("16:00").do(dojob)
     schedule.every().day.at("20:00").do(dojob)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
