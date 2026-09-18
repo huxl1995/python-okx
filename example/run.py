@@ -6,8 +6,7 @@
 """
 import sys
 from pathlib import Path
-from time import sleep, time
-
+import time
 import numpy as np
 import pandas as pd
 from datetime import datetime,timedelta
@@ -35,7 +34,7 @@ PRED_LEN = 5          # 预测未来 5 根 K 线
 EPOCHS = 50
 PER_EPOCHS=5
 TRADE_FEE_RATE=0.0005
-QUANT_RATE=0.01
+QUANT_RATE=0.001
 LABEL='future'
 MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+LABEL+"_"+"model.pt"
 MODEL_PATH = Path(__file__).parent / MODEL_NAME
@@ -153,12 +152,12 @@ def pre_train():
         epochs=EPOCHS,
     )
 if __name__ == "__main__":
-    schedule.every().day.at("00:00").do(dojob)
-    schedule.every().day.at("04:00").do(dojob)
-    schedule.every().day.at("08:00").do(dojob)
-    schedule.every().day.at("12:00").do(dojob)
-    schedule.every().day.at("16:00").do(dojob)
-    schedule.every().day.at("20:00").do(dojob)
+    schedule.every().day.at("23:59").do(dojob)
+    schedule.every().day.at("03:59").do(dojob)
+    schedule.every().day.at("07:59").do(dojob)
+    schedule.every().day.at("11:59").do(dojob)
+    schedule.every().day.at("15:59").do(dojob)
+    schedule.every().day.at("19:59").do(dojob)
     while True:
         schedule.run_pending()
         time.sleep(1)
