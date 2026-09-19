@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 from typing import Optional
 
 import pandas as pd
@@ -37,7 +38,7 @@ client = DerivativesTradingUsdsFutures(config_rest_api=get_binanace_restAPI())
 
 
 def fetch_klines(
-    symbol: str = "BNBUSDT",
+    symbol: str = "BTCUSDT",
     interval: str = KlineCandlestickDataIntervalEnum["INTERVAL_1m"].value,
     limit: int = 1000,
     start_time = None,
@@ -85,5 +86,5 @@ def klines(
 
 
 if __name__ == "__main__":
-    data = fetch_klines(interval=KlineCandlestickDataIntervalEnum.INTERVAL_1d)
+    data = fetch_klines(interval=KlineCandlestickDataIntervalEnum.INTERVAL_4h,end_time=int(datetime.now().timestamp()) * 1000)
     logging.info("klines sample:\n%s", data.tail())

@@ -25,7 +25,7 @@ def get_binanace_restAPI():
         api_key=os.getenv("API_KEY", ""),
         api_secret=os.getenv("API_SECRET", ""),
         base_path=os.getenv(
-            "BASE_PATH", DERIVATIVES_TRADING_USDS_FUTURES_REST_API_TESTNET_URL
+            "BASE_PATH", DERIVATIVES_TRADING_USDS_FUTURES_REST_API_PROD_URL
         ),
     )
 
