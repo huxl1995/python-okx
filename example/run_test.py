@@ -4,9 +4,11 @@
 运行方式（在项目根目录）:
     ./venv/bin/python binanace/example.py
 """
+import random
 import sys
 from pathlib import Path
-import time
+from time import sleep
+
 import numpy as np
 import pandas as pd
 from datetime import datetime,timedelta
@@ -26,7 +28,7 @@ from dline.stand import CSNStand, LOGZSCOREStand, Type, restorePredictions, roll
 from binanace.future.future_klines import fetch_klines
 # ---------- 参数配置 ----------
 SYMBOL = "BTCUSDT"
-INTERVAL = "4h"       # K 线周期: 1m, 5m, 1h, 1d 等
+INTERVAL = "1m"       # K 线周期: 1m, 5m, 1h, 1d 等
 LIMIT = 150          # 拉取条数（Binance 单次最多 1000）
 SEQ_LEN = 15
 WINDOW_SIZE = SEQ_LEN      # 滚动 Z-Score 窗口# 输入序列长度（用过去 30 根 K 线）
@@ -36,7 +38,8 @@ PER_EPOCHS=5
 TRADE_FEE_RATE=0.0005
 QUANT_RATE=0.01
 LABEL='future'
-MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+LABEL+"_"+"model.pt"
+MODEL_NAME="testmodel.pt"
+
 MODEL_PATH = Path(__file__).parent / MODEL_NAME
 FEATURE_COLUMNS = [
     "openScaled", "highScaled", "lowScaled", "closeScaled",
@@ -46,21 +49,10 @@ FEATURE_COLUMNS = [
     "volumeLogScaled",
 ]
 PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
+STATE_LABEL=True
 def state(restored,quant,close_price):
-    min_close=min(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
-    max_close=max(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
-    if close_price>=max_close:
-        if quant>=0:
-            return -1
-        else:
-            return 0
-    elif close_price<=min_close:
-        if quant<=0:
-            return 1
-        else:
-            return 0
-    else:
-        return 0
+    my_list=[1,-1]
+    return random.choice(my_list)
 def dojob():
     kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(datetime.now().timestamp()) * 1000)
     raw_data = kline_df.copy()
@@ -152,12 +144,7 @@ def pre_train():
         epochs=EPOCHS,
     )
 if __name__ == "__main__":
-    schedule.every().day.at("23:59").do(dojob)
-    schedule.every().day.at("03:59").do(dojob)
-    schedule.every().day.at("07:59").do(dojob)
-    schedule.every().day.at("11:59").do(dojob)
-    schedule.every().day.at("15:59").do(dojob)
-    schedule.every().day.at("19:59").do(dojob)
+    pre_train()
     while True:
-        schedule.run_pending()
-        time.sleep(1)
+        dojob()
+        sleep(60)

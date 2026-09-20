@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-df=pd.read_csv('150_4h_50_5_15_5_0.0005_future_money.csv')
+df=pd.read_csv('150_4h_50_5_15_5_0.0005_future_money.csv.run')
 # df['money_diff']=df['money'].diff()
 # df['clear_money_diff']=df['clear_money'].diff()
 df.plot(kind='line', x='date', y=['money','clear_money'], title='money')
