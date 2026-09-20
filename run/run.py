@@ -6,14 +6,14 @@
 """
 import sys
 from pathlib import Path
-
+import time
 import numpy as np
 import pandas as pd
 from datetime import datetime,timedelta
-
+import schedule
 from binanace.example import LIMIT
 from binanace.future.account import get_position_amt
-from binanace.future.trade import new_limit_order
+from binanace.future.trade import new_limit_order, cancel_all_open_orders
 
 ROOT = Path(__file__).resolve().parent.parent
 DLINE_DIR = ROOT / "dline"
@@ -104,11 +104,60 @@ def dojob():
         start_index,
         priceKeys=PRICE_KEYS,
     )
-    quant = get_position_amt()
+    cancel_all_open_orders(SYMBOL)
+    quant = get_position_amt(SYMBOL)
     change_quant = state(restored, quant, kline_df['close'].to_numpy()[-1])
     if change_quant < 0:
-        new_limit_order(SYMBOL, "SELL", change_quant * QUANT_RATE, kline_df['close'].to_numpy()[-1])
+        new_limit_order(SYMBOL, "SELL", -1*change_quant * QUANT_RATE, kline_df['close'].to_numpy()[-1])
+        print(f"do job once, side is SELL")
     elif change_quant > 0:
         new_limit_order(SYMBOL, "BUY", change_quant * QUANT_RATE, kline_df['close'].to_numpy()[-1])
+        print(f"do job once, side is BUY")
+    else:
+        print(f"do job once, side is HOLD")
+def pre_train():
+    # 1. 从 Binance 拉取 K 线
+    print(f"拉取 {SYMBOL} {INTERVAL} K 线，limit={LIMIT} ...")
+    end_time = datetime(2026, 9, 16, 23, 0, 0)
+    kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(end_time.timestamp()) * 1000)
+    raw_data = kline_df.copy()
+    print(kline_df.tail(3))
+
+    # 2. 特征标准化（与 dline/example.py 相同流程）
+    kline_df["date"] = pd.to_datetime(kline_df["date"])
+    for key in ("open", "high", "low", "close"):
+        rollingZScoreStand(kline_df, WINDOW_SIZE, key)
+    CSNStand(kline_df, Type.MONTH, "date")
+    CSNStand(kline_df, Type.DAY, "date")
+    CSNStand(kline_df, Type.HOUR, "date")
+    LOGZSCOREStand(kline_df, WINDOW_SIZE, "volume")
+
+    # 前 WINDOW_SIZE 行因滚动窗口不足会产生 NaN，丢弃
+    kline_df.drop(kline_df.index[0:WINDOW_SIZE], inplace=True)
+    kline_df.reset_index(drop=True, inplace=True)
+
+    data_np = kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
+
+    # 3. 划分训练集与预测输入
+    train_data = data_np
+
+    print(f"训练样本数: {len(train_data)}, 输入窗口: {train_data.shape}")
+
+    # 4. 训练 DLinearForStock 并保存
+    train_and_save(
+        data=train_data,
+        save_path=str(MODEL_PATH),
+        seq_len=SEQ_LEN,
+        pred_len=PRED_LEN,
+        epochs=EPOCHS,
+    )
 if __name__ == "__main__":
-    dojob()
+    schedule.every().day.at("23:59").do(dojob)
+    schedule.every().day.at("03:59").do(dojob)
+    schedule.every().day.at("07:59").do(dojob)
+    schedule.every().day.at("11:59").do(dojob)
+    schedule.every().day.at("15:59").do(dojob)
+    schedule.every().day.at("19:59").do(dojob)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
