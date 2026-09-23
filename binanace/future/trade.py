@@ -101,12 +101,26 @@ def cancel_all_algo_open_orders(symbol):
         logging.info(f"cancel_all_algo_open_orders() response: {data}")
     except Exception as e:
         logging.error(f"cancel_all_algo_open_orders() error: {e}")
-def trailing_stop_market(symbol):
+def trailing_stop_market(symbol,stop_rate):
     response = client.rest_api.position_information_v3(symbol)
     data=response.data()
-    print(1)
+    quant=0
+    entry_price=0
+    for position in data:
+        if position.symbol==symbol:
+            quant=float(position.position_amt)
+            entry_price=float(position.entry_price)
+    if quant==0:
+        return
+    elif quant<0:
+        stop_price=(1+stop_rate)*entry_price
+        new_algo_order(symbol,"BUY",round(stop_price,2))
+    else:
+        stop_price=(1-stop_rate)*entry_price
+        new_algo_order(symbol,"SELL",round(stop_price,2))
 if __name__=="__main__":
     #new_order("BTCUSDT","BUY","MARKET",1)
     #new_market_order("BTCUSDT","SELL",0.01)
     #new_algo_order("BTCUSDT","SELL",81000)
-    trailing_stop_market("BTCUSDT")
+    cancel_all_algo_open_orders('BTCUSDT')
+    trailing_stop_market("BTCUSDT",0.001)
