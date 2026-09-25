@@ -1,5 +1,6 @@
 import logging
 import os
+from time import sleep
 from typing import Optional
 from datetime import datetime,timedelta
 
@@ -87,8 +88,11 @@ def klines(
 
 if __name__ == "__main__":
     end_time=datetime(2025,1,20,0,0,0)
-    while end_time<datetime(2026,9,16,22,0,0):
-        data = fetch_klines(interval="15s", start_time=int(end_time)*1000,end_time=int(end_time+timedelta(hours=4)) * 1000)
-    end_time=end_time+timedelta(hours=4
-                                )
-    logging.info("klines sample:\n%s", data.tail())
+    dataframe=pd.DataFrame()
+    while end_time<datetime(2026,9,17,0,0,0):
+        data = fetch_klines(interval="1d", start_time=int(end_time.timestamp())*1000,end_time=int((end_time+timedelta(days=30)).timestamp()) * 1000)
+        dataframe=pd.concat([dataframe,data],ignore_index=True)
+        end_time = end_time + timedelta(days=30)
+        dataframe.to_csv("klines_24h.csv")
+        sleep(1)
+    logging.info("klines sample:\n%s", dataframe.tail())
