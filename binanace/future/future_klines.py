@@ -1,7 +1,7 @@
 import logging
 import os
-from datetime import datetime
 from typing import Optional
+from datetime import datetime,timedelta
 
 import pandas as pd
 
@@ -86,5 +86,9 @@ def klines(
 
 
 if __name__ == "__main__":
-    data = fetch_klines(interval=KlineCandlestickDataIntervalEnum.INTERVAL_4h,end_time=int(datetime.now().timestamp()) * 1000)
+    end_time=datetime(2025,1,20,0,0,0)
+    while end_time<datetime(2026,9,16,22,0,0):
+        data = fetch_klines(interval="15s", start_time=int(end_time)*1000,end_time=int(end_time+timedelta(hours=4)) * 1000)
+    end_time=end_time+timedelta(hours=4
+                                )
     logging.info("klines sample:\n%s", data.tail())
