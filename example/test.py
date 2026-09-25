@@ -32,8 +32,9 @@ PRED_LEN = 5          # 预测未来 5 根 K 线
 EPOCHS = 50
 PER_EPOCHS=5
 TRADE_FEE_RATE=0.0005
+STOP_MARKET_RATE=0.05
 LABEL='future'
-MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+LABEL+"_"+"model.pt"
+MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+str(STOP_MARKET_RATE)+"_"+LABEL+"_STOP_MARKET"+"model.pt"
 MODEL_PATH = Path(__file__).parent / MODEL_NAME
 FEATURE_COLUMNS = [
     "openScaled", "highScaled", "lowScaled", "closeScaled",
@@ -47,11 +48,10 @@ PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 def simBTC():
     # 1. 从 Binance 拉取 K 线
     print(f"拉取 {SYMBOL} {INTERVAL} K 线，limit={LIMIT} ...")
-    end_time=datetime(2025,1,20,0,0,0)
-    kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT,end_time=int(end_time.timestamp())*1000)
-    raw_data = kline_df.copy()
+    start_time=datetime(2025,1,20,0,0,0)
+    kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT,end_time=int(start_time.timestamp())*1000)
     print(kline_df.tail(3))
-
+    df_market=pd.read_csv("../binanace/future/klines_1m_all.csv")
     # 2. 特征标准化（与 dline/example.py 相同流程）
     kline_df["date"] = pd.to_datetime(kline_df["date"])
     for key in ("open", "high", "low", "close"):
@@ -85,9 +85,10 @@ def simBTC():
     num=0
     quant=0
     money_list=[]
-    money_list.append({"date":end_time,"money":0,"clear_money":0})
-    while end_time<datetime(2026,9,16,22,0,0):
-        kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(end_time.timestamp()) * 1000)
+    money_list.append({"date":start_time,"money":0,"clear_money":0})
+    stop_price=0
+    while start_time<datetime(2026,9,16,22,0,0):
+        kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(start_time.timestamp()) * 1000)
         raw_data=kline_df.copy()
         # 2. 特征标准化（与 dline/example.py 相同流程）
         kline_df["date"] = pd.to_datetime(kline_df["date"])
@@ -133,16 +134,38 @@ def simBTC():
         change_quant=state(restored,quant,kline_df['close'].to_numpy()[-1])
         quant=quant+change_quant
         money -= change_quant * kline_df['close'].to_numpy()[-1]
-        if change_quant<=0:
+        if change_quant<0:
             clear_money -= change_quant * (1 - TRADE_FEE_RATE) * kline_df['close'].to_numpy()[-1]
-        else:
+            stop_price=kline_df['close'].to_numpy()[-1]*(1+STOP_MARKET_RATE)
+        elif change_quant>0:
             clear_money -= change_quant * (1 + TRADE_FEE_RATE) * kline_df['close'].to_numpy()[-1]
+            stop_price=kline_df['close'].to_numpy()[-1]*(1-STOP_MARKET_RATE)
         print(f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {state},money is {money},clear_money is {clear_money},quant is {quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
-        end_time=end_time+timedelta(hours=4)
-        money_list.append({"date":end_time,"money":money+quant*kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*kline_df['close'].to_numpy()[-1]})
+        market_time=start_time+timedelta(minutes=1)
+        while quant!=0 and market_time<start_time+timedelta(hours=4):
+            market_price=query_price(df_market,market_time)
+            if quant <0:
+                if market_price>=stop_price:
+                    clear_money -= quant * (1 - TRADE_FEE_RATE) * stop_price
+                    quant=0
+                    break
+                else:
+                    if market_price*(1+STOP_MARKET_RATE)<stop_price:
+                        stop_price=market_price*(1+STOP_MARKET_RATE)
+            elif quant>0:
+                if market_price<=stop_price:
+                    clear_money += quant * (1 - TRADE_FEE_RATE) * stop_price
+                    quant=0
+                    break
+                else:
+                    if market_price*(1+STOP_MARKET_RATE)>stop_price:
+                        stop_price=market_price*(1+STOP_MARKET_RATE)>stop_price
+            market_time=market_time+timedelta(minutes=1)
+        start_time=start_time+timedelta(hours=4)
+        money_list.append({"date":start_time,"money":money+quant*kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*kline_df['close'].to_numpy()[-1]})
         num+=1
     money_df=pd.DataFrame(money_list)
-    money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_money.csv")
+    money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_STOP_MARKET_money.csv")
 def state(restored,quant,close_price):
     min_close=min(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
     max_close=max(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
@@ -158,5 +181,30 @@ def state(restored,quant,close_price):
             return 0
     else:
         return 0
+def stop_market(df, quant, stop_price):
+    if quant>0:
+        for i in range(len(df)):
+            if df['close'][i]<=stop_price:
+                return 0,quant*stop_price,stop_price
+            elif df['close'][i]*(1-STOP_MARKET_RATE)>stop_price:
+                stop_price=df['close'][i]*(1-STOP_MARKET_RATE)
+    elif quant<0:
+        for i in range(len(df)):
+            if df['close'][i]>=stop_price:
+                return 0,quant*stop_price,stop_price
+            elif df['close'][i]*(1+STOP_MARKET_RATE)<stop_price:
+                stop_price=df['close'][i]*(1+STOP_MARKET_RATE)
+    return quant,quant*stop_price,stop_price
+def query(df,start_time,end_time):
+    start_index=0
+    end_index=0
+    for i in len(df):
+        if df['date'][i]==start_time:
+            start_index=i
+        elif df['date'][i]==end_time:
+            end_index=i
+    return df[start_index:end_index].copy()
+def query_price(df,query_time):
+    return df[df['date']==query_time]['close']
 if __name__ == "__main__":
     simBTC()
