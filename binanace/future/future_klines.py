@@ -87,12 +87,12 @@ def klines(
 
 
 if __name__ == "__main__":
-    end_time=datetime(2026,1,1,21,0,0)
+    end_time=datetime(2025,1,20,0,0,0)
     dataframe=pd.DataFrame()
-    while end_time<datetime(2026,1,11,21,0,0):
-        data = fetch_klines(interval="1m", start_time=int(end_time.timestamp())*1000,end_time=int((end_time+timedelta(hours=15)).timestamp()) * 1000)
+    while end_time<datetime(2026,9,17,0,0,0):
+        data = fetch_klines(interval="1d", start_time=int(end_time.timestamp())*1000,end_time=int((end_time+timedelta(days=30)).timestamp()) * 1000)
         dataframe=pd.concat([dataframe,data],ignore_index=True)
-        end_time = end_time + timedelta(hours=15)
-        dataframe.to_csv("klines_1m.csv.part2")
+        end_time = end_time + timedelta(days=30)
+        dataframe.to_csv("klines_24h.csv")
         sleep(1)
     logging.info("klines sample:\n%s", dataframe.tail())

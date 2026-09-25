@@ -25,16 +25,12 @@ KLINES_COLUMNS = [
     "ignore",
 ]
 if __name__ == "__main__":
-    df1=pd.read_csv("klines_1m.csv.part1")
-    df2=pd.read_csv("klines_1m.csv.part2")
-    df3=pd.read_csv("klines_1m.csv")
-
-    df=pd.concat([df1,df2,df3],ignore_index=True)
+    df=pd.read_csv("klines_24h.csv")
     drop_index=[]
     for i in range(len(df)):
         if(i>0 and df.iloc[i,1]==df.iloc[i-1,1]):
             drop_index.append(i)
     df=df.drop(index=drop_index)
     dfa=df[["date", "open", "high", "low", "close", "volume"]].reset_index(drop=True)
-    dfa.to_csv("klines_1m_all.csv")
+    dfa.to_csv("klines_24h_all.csv")
     print(drop_index)
