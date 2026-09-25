@@ -48,9 +48,12 @@ PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 def simBTC():
     # 1. 从 Binance 拉取 K 线
     print(f"拉取 {SYMBOL} {INTERVAL} K 线，limit={LIMIT} ...")
-    start_time=datetime(2025,1,20,0,0,0)
+    start_time=datetime(2025,1,19,20,0,0)
+    begin_time=start_time-timedelta(hours=LIMIT*4)
     kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT,end_time=int(start_time.timestamp())*1000)
     print(kline_df.tail(3))
+    kline_df1=pd.read_csv("../binanace/future/klines_4h_all.csv")
+    kline_df=pd.concat([kline_df,kline_df1],ignore_index=True)
     df_market=pd.read_csv("../binanace/future/klines_1m_all.csv")
     # 2. 特征标准化（与 dline/example.py 相同流程）
     kline_df["date"] = pd.to_datetime(kline_df["date"])
