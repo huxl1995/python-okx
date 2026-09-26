@@ -152,8 +152,8 @@ def simBTC():
                     quant=0
                     break
                 else:
-                    if market_price*(1+STOP_MARKET_RATE)>stop_price:
-                        stop_price=market_price*(1+STOP_MARKET_RATE)
+                    if market_price*(1-STOP_MARKET_RATE)>stop_price:
+                        stop_price=market_price*(1-STOP_MARKET_RATE)
             market_time=market_time+timedelta(minutes=1)
         start_time=start_time+timedelta(hours=4)
         money_list.append({"date":start_time,"money":money+quant*loop_kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*loop_kline_df['close'].to_numpy()[-1]})
