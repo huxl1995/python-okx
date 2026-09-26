@@ -93,7 +93,7 @@ def simBTC():
     money_list=[]
     money_list.append({"date":start_time,"money":0,"clear_money":0})
     stop_price=0
-    while start_time<datetime(2026,9,16,22,0,0):
+    while start_time<=datetime(2026,9,16,12,0,0):
         begin_index+=1
         loop_kline_df=query_klines(kline_df,start_time-timedelta(hours=4*120),start_time)
         data_np = loop_kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
