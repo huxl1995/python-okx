@@ -34,7 +34,7 @@ PER_EPOCHS=5
 TRADE_FEE_RATE=0.0005
 STOP_MARKET_RATE=0.02
 LABEL='future'
-MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+str(STOP_MARKET_RATE)+"_"+LABEL+"_STOP_MARKET"+"model.pt"
+MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+str(STOP_MARKET_RATE)+"_"+LABEL+"_STOP_MARKET_"+"model.pt"
 MODEL_PATH = Path(__file__).parent / MODEL_NAME
 FEATURE_COLUMNS = [
     "openScaled", "highScaled", "lowScaled", "closeScaled",
@@ -133,33 +133,41 @@ def simBTC():
             clear_money -= change_quant * (1 + TRADE_FEE_RATE) * loop_kline_df['close'].to_numpy()[-1]
             stop_price=loop_kline_df['close'].to_numpy()[-1]*(1-STOP_MARKET_RATE)
         print(f"num is {num},time is {loop_kline_df['date'].to_numpy()[-1]},state is {state},money is {money},clear_money is {clear_money},quant is {quant},actual clse is {loop_kline_df['close'].to_numpy()[-1]}")
-        market_time=start_time+timedelta(minutes=1)
-        while quant!=0 and market_time<start_time+timedelta(hours=4):
-            market_price=query_price(market_price_dict,df_market,market_time)
-            if quant <0:
-                if market_price>=stop_price:
-                    clear_money += quant * (1 + TRADE_FEE_RATE) * stop_price
-                    money += quant *  stop_price
-                    quant=0
-                    break
-                else:
-                    if market_price*(1+STOP_MARKET_RATE)<stop_price:
-                        stop_price=market_price*(1+STOP_MARKET_RATE)
-            elif quant>0:
-                if market_price<=stop_price:
-                    clear_money += quant * (1 - TRADE_FEE_RATE) * stop_price
-                    money += quant * stop_price
-                    quant=0
-                    break
-                else:
-                    if market_price*(1-STOP_MARKET_RATE)>stop_price:
-                        stop_price=market_price*(1-STOP_MARKET_RATE)
-            market_time=market_time+timedelta(minutes=1)
+        clear_money, money, quant = stop_market(clear_money, df_market, market_price_dict, money, quant, start_time,
+                                                stop_price)
         start_time=start_time+timedelta(hours=4)
         money_list.append({"date":start_time,"money":money+quant*loop_kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*loop_kline_df['close'].to_numpy()[-1]})
         num+=1
     money_df=pd.DataFrame(money_list)
-    money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_STOP_MARKET_money.csv")
+    money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{STOP_MARKET_RATE}_{LABEL}_STOP_MARKET_money.csv")
+
+
+def stop_market(clear_money, df_market, market_price_dict, money, quant, start_time, stop_price):
+    market_time = start_time + timedelta(minutes=1)
+    while quant != 0 and market_time < start_time + timedelta(hours=4):
+        market_price = query_price(market_price_dict, df_market, market_time)
+        if quant < 0:
+            if market_price >= stop_price:
+                clear_money += quant * (1 + TRADE_FEE_RATE) * stop_price
+                money += quant * stop_price
+                quant = 0
+                break
+            else:
+                if market_price * (1 + STOP_MARKET_RATE) < stop_price:
+                    stop_price = market_price * (1 + STOP_MARKET_RATE)
+        elif quant > 0:
+            if market_price <= stop_price:
+                clear_money += quant * (1 - TRADE_FEE_RATE) * stop_price
+                money += quant * stop_price
+                quant = 0
+                break
+            else:
+                if market_price * (1 - STOP_MARKET_RATE) > stop_price:
+                    stop_price = market_price * (1 - STOP_MARKET_RATE)
+        market_time = market_time + timedelta(minutes=1)
+    return clear_money, money, quant
+
+
 def state(restored,quant,close_price):
     min_close=min(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
     max_close=max(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
@@ -175,20 +183,6 @@ def state(restored,quant,close_price):
             return 0
     else:
         return 0
-def stop_market(df, quant, stop_price):
-    if quant>0:
-        for i in range(len(df)):
-            if df['close'][i]<=stop_price:
-                return 0,quant*stop_price,stop_price
-            elif df['close'][i]*(1-STOP_MARKET_RATE)>stop_price:
-                stop_price=df['close'][i]*(1-STOP_MARKET_RATE)
-    elif quant<0:
-        for i in range(len(df)):
-            if df['close'][i]>=stop_price:
-                return 0,quant*stop_price,stop_price
-            elif df['close'][i]*(1+STOP_MARKET_RATE)<stop_price:
-                stop_price=df['close'][i]*(1+STOP_MARKET_RATE)
-    return quant,quant*stop_price,stop_price
 def query(df,start_time,end_time):
     start_index=0
     end_index=0
