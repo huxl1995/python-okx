@@ -138,7 +138,8 @@ def simBTC():
             market_price=query_price(market_price_dict,df_market,market_time)
             if quant <0:
                 if market_price>=stop_price:
-                    clear_money -= quant * (1 - TRADE_FEE_RATE) * stop_price
+                    clear_money += quant * (1 + TRADE_FEE_RATE) * stop_price
+                    money += quant *  stop_price
                     quant=0
                     break
                 else:
@@ -147,6 +148,7 @@ def simBTC():
             elif quant>0:
                 if market_price<=stop_price:
                     clear_money += quant * (1 - TRADE_FEE_RATE) * stop_price
+                    money += quant * stop_price
                     quant=0
                     break
                 else:
