@@ -55,6 +55,9 @@ def simBTC():
     kline_df1=pd.read_csv("../binanace/future/klines_4h_all.csv")
     kline_df=pd.concat([kline_df,kline_df1],ignore_index=True)
     df_market=pd.read_csv("../binanace/future/klines_1m_all.csv")
+    market_price_dict={}
+    for i in range(len(df_market)):
+        market_price_dict[convert_datetime(df_market['date'][i])]=i
     # 2. 特征标准化（与 dline/example.py 相同流程）
     kline_df["date"] = pd.to_datetime(kline_df["date"])
     for key in ("open", "high", "low", "close"):
@@ -132,7 +135,7 @@ def simBTC():
         print(f"num is {num},time is {loop_kline_df['date'].to_numpy()[-1]},state is {state},money is {money},clear_money is {clear_money},quant is {quant},actual clse is {loop_kline_df['close'].to_numpy()[-1]}")
         market_time=start_time+timedelta(minutes=1)
         while quant!=0 and market_time<start_time+timedelta(hours=4):
-            market_price=query_price(df_market,market_time)
+            market_price=query_price(market_price_dict,df_market,market_time)
             if quant <0:
                 if market_price>=stop_price:
                     clear_money -= quant * (1 - TRADE_FEE_RATE) * stop_price
@@ -193,8 +196,8 @@ def query(df,start_time,end_time):
         elif df['date'][i]==end_time:
             end_index=i
     return df[start_index:end_index].copy()
-def query_price(df,query_time):
-    return df[df['date']==str(query_time)]['close'].values[0]
+def query_price(price_dict,df,query_time):
+    return df['close'][price_dict[query_time]]
 def convert_datetime(string):
     return datetime.strptime(string,"%Y-%m-%d %H:%M:%S")
 def query_klines(df,start_time,end_time):
