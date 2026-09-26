@@ -67,8 +67,8 @@ def simBTC():
     # 前 WINDOW_SIZE 行因滚动窗口不足会产生 NaN，丢弃
     kline_df.drop(kline_df.index[0:WINDOW_SIZE], inplace=True)
     kline_df.reset_index(drop=True, inplace=True)
-
-    data_np = kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
+    begin_index=LIMIT
+    data_np = kline_df[FEATURE_COLUMNS][0:begin_index-WINDOW_SIZE].to_numpy(dtype=np.float64)
 
     # 3. 划分训练集与预测输入
     train_data = data_np
@@ -91,23 +91,9 @@ def simBTC():
     money_list.append({"date":start_time,"money":0,"clear_money":0})
     stop_price=0
     while start_time<datetime(2026,9,16,22,0,0):
-        kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(start_time.timestamp()) * 1000)
-        raw_data=kline_df.copy()
-        # 2. 特征标准化（与 dline/example.py 相同流程）
-        kline_df["date"] = pd.to_datetime(kline_df["date"])
-        for key in ("open", "high", "low", "close"):
-            rollingZScoreStand(kline_df, WINDOW_SIZE, key)
-        CSNStand(kline_df, Type.MONTH, "date")
-        CSNStand(kline_df, Type.DAY, "date")
-        CSNStand(kline_df, Type.HOUR, "date")
-        LOGZSCOREStand(kline_df, WINDOW_SIZE, "volume")
-
-        # 前 WINDOW_SIZE 行因滚动窗口不足会产生 NaN，丢弃
-        kline_df.drop(kline_df.index[0:WINDOW_SIZE], inplace=True)
-        kline_df.reset_index(drop=True, inplace=True)
-
-        data_np = kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
-
+        begin_index+=1
+        loop_kline_df=query_klines(kline_df,start_time-timedelta(hours=4*120),start_time)
+        data_np = loop_kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
         # 3. 划分训练集与预测输入
         train_data = data_np
         # 4. 训练 DLinearForStock 并保存
@@ -125,25 +111,25 @@ def simBTC():
         scaled_pred = predict(preData, model)
 
         # 6. 将预测结果还原为真实 OHLC 价格
-        start_index = len(raw_data)  # 预测的是未来数据，从 raw_data 末尾开始
+        start_index = len(loop_kline_df)  # 预测的是未来数据，从 raw_data 末尾开始
         restored = restorePredictions(
             scaled_pred,
-            raw_data,
+            loop_kline_df,
             WINDOW_SIZE,
             start_index,
             priceKeys=PRICE_KEYS,
         )
 
-        change_quant=state(restored,quant,kline_df['close'].to_numpy()[-1])
+        change_quant=state(restored,quant,loop_kline_df['close'].to_numpy()[-1])
         quant=quant+change_quant
-        money -= change_quant * kline_df['close'].to_numpy()[-1]
+        money -= change_quant * loop_kline_df['close'].to_numpy()[-1]
         if change_quant<0:
-            clear_money -= change_quant * (1 - TRADE_FEE_RATE) * kline_df['close'].to_numpy()[-1]
-            stop_price=kline_df['close'].to_numpy()[-1]*(1+STOP_MARKET_RATE)
+            clear_money -= change_quant * (1 - TRADE_FEE_RATE) * loop_kline_df['close'].to_numpy()[-1]
+            stop_price=loop_kline_df['close'].to_numpy()[-1]*(1+STOP_MARKET_RATE)
         elif change_quant>0:
-            clear_money -= change_quant * (1 + TRADE_FEE_RATE) * kline_df['close'].to_numpy()[-1]
-            stop_price=kline_df['close'].to_numpy()[-1]*(1-STOP_MARKET_RATE)
-        print(f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {state},money is {money},clear_money is {clear_money},quant is {quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
+            clear_money -= change_quant * (1 + TRADE_FEE_RATE) * loop_kline_df['close'].to_numpy()[-1]
+            stop_price=loop_kline_df['close'].to_numpy()[-1]*(1-STOP_MARKET_RATE)
+        print(f"num is {num},time is {loop_kline_df['date'].to_numpy()[-1]},state is {state},money is {money},clear_money is {clear_money},quant is {quant},actual clse is {loop_kline_df['close'].to_numpy()[-1]}")
         market_time=start_time+timedelta(minutes=1)
         while quant!=0 and market_time<start_time+timedelta(hours=4):
             market_price=query_price(df_market,market_time)
@@ -162,10 +148,10 @@ def simBTC():
                     break
                 else:
                     if market_price*(1+STOP_MARKET_RATE)>stop_price:
-                        stop_price=market_price*(1+STOP_MARKET_RATE)>stop_price
+                        stop_price=market_price*(1+STOP_MARKET_RATE)
             market_time=market_time+timedelta(minutes=1)
         start_time=start_time+timedelta(hours=4)
-        money_list.append({"date":start_time,"money":money+quant*kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*kline_df['close'].to_numpy()[-1]})
+        money_list.append({"date":start_time,"money":money+quant*loop_kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*loop_kline_df['close'].to_numpy()[-1]})
         num+=1
     money_df=pd.DataFrame(money_list)
     money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_STOP_MARKET_money.csv")
@@ -208,6 +194,12 @@ def query(df,start_time,end_time):
             end_index=i
     return df[start_index:end_index].copy()
 def query_price(df,query_time):
-    return df[df['date']==query_time]['close']
+    return df[df['date']==str(query_time)]['close'].values[0]
+def convert_datetime(string):
+    return datetime.strptime(string,"%Y-%m-%d %H:%M:%S")
+def query_klines(df,start_time,end_time):
+    start_index=df[df['date']==str(start_time)].index.values[0]
+    end_index=df[df['date']==str(end_time)].index.values[0]
+    return df[start_index:end_index]
 if __name__ == "__main__":
     simBTC()

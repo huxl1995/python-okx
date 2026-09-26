@@ -40,7 +40,9 @@ def getEffectiveHistoryCandleSticks(data):
     data['date']=pd.to_datetime(data['ts'],unit='ms')
     return data[["date","open","high","low","close","volCcyQuote"]]
 def removeOverRecord(data,colName):
+    drop_index=[]
     for i in range(0,len(data)):
         if data[colName][i]>2*data[colName+'Rolling_Mean'][i] or data[colName][i]<0.5*data[colName+'Rolling_Mean'][i]:
-            data.drop(index=i,inplace=True)
+            drop_index.append(i)
+    data.drop(index=drop_index)
     data.reset_index(drop=True)
