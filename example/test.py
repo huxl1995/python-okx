@@ -50,7 +50,6 @@ def simBTC():
     # 1. 从 Binance 拉取 K 线
     print(f"拉取 {SYMBOL} {INTERVAL} K 线，limit={LIMIT} ...")
     start_time=datetime(2025,1,19,20,0,0)
-    begin_time=start_time-timedelta(hours=LIMIT*4)
     kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT,end_time=int(start_time.timestamp())*1000)
     print(kline_df.tail(3))
     kline_df1=pd.read_csv("../binanace/future/klines_4h_all.csv")
@@ -60,17 +59,7 @@ def simBTC():
     for i in range(len(df_market)):
         market_price_dict[convert_datetime(df_market['date'][i])]=i
     # 2. 特征标准化（与 dline/example.py 相同流程）
-    kline_df["date"] = pd.to_datetime(kline_df["date"])
-    for key in ("open", "high", "low", "close"):
-        rollingZScoreStand(kline_df, WINDOW_SIZE, key)
-    CSNStand(kline_df, Type.MONTH, "date")
-    CSNStand(kline_df, Type.DAY, "date")
-    CSNStand(kline_df, Type.HOUR, "date")
-    LOGZSCOREStand(kline_df, WINDOW_SIZE, "volume")
-
-    # 前 WINDOW_SIZE 行因滚动窗口不足会产生 NaN，丢弃
-    kline_df.drop(kline_df.index[0:WINDOW_SIZE], inplace=True)
-    kline_df.reset_index(drop=True, inplace=True)
+    stand_data(kline_df)
     begin_index=LIMIT
     data_np = kline_df[FEATURE_COLUMNS][0:begin_index-WINDOW_SIZE].to_numpy(dtype=np.float64)
 
@@ -96,7 +85,7 @@ def simBTC():
     stop_price=0
     while start_time<=datetime(2026,9,16,12,0,0):
         begin_index+=1
-        loop_kline_df=query_klines(kline_df,start_time-timedelta(hours=4*120),start_time)
+        loop_kline_df=query_klines(kline_df,start_time-timedelta(hours=4*(LIMIT-WINDOW_SIZE)),start_time)
         data_np = loop_kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
         # 3. 划分训练集与预测输入
         train_data = data_np
@@ -134,13 +123,26 @@ def simBTC():
             clear_money -= change_quant * (1 + TRADE_FEE_RATE) * loop_kline_df['close'].to_numpy()[-1]
             stop_price=loop_kline_df['close'].to_numpy()[-1]*(1-STOP_MARKET_RATE)
         print(f"num is {num},time is {loop_kline_df['date'].to_numpy()[-1]},state is {state},money is {money},clear_money is {clear_money},quant is {quant},actual clse is {loop_kline_df['close'].to_numpy()[-1]}")
-        clear_money, money, quant = stop_market(clear_money, df_market, market_price_dict, money, quant, start_time,
-                                                stop_price)
+        # clear_money, money, quant = stop_market(clear_money, df_market, market_price_dict, money, quant, start_time-timedelta(hours=4),
+        #                                         stop_price)
         start_time=start_time+timedelta(hours=4)
         money_list.append({"date":start_time,"money":money+quant*loop_kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*loop_kline_df['close'].to_numpy()[-1]})
         num+=1
     money_df=pd.DataFrame(money_list)
     money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{STOP_MARKET_RATE}_{LABEL}_STOP_MARKET_money.csv")
+
+
+def stand_data(kline_df):
+    kline_df["date"] = pd.to_datetime(kline_df["date"])
+    for key in ("open", "high", "low", "close"):
+        rollingZScoreStand(kline_df, WINDOW_SIZE, key)
+    CSNStand(kline_df, Type.MONTH, "date")
+    CSNStand(kline_df, Type.DAY, "date")
+    CSNStand(kline_df, Type.HOUR, "date")
+    LOGZSCOREStand(kline_df, WINDOW_SIZE, "volume")
+    # 前 WINDOW_SIZE 行因滚动窗口不足会产生 NaN，丢弃
+    kline_df.drop(kline_df.index[0:WINDOW_SIZE], inplace=True)
+    kline_df.reset_index(drop=True, inplace=True)
 
 
 def stop_market(clear_money, df_market, market_price_dict, money, quant, start_time, stop_price):
