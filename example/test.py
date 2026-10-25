@@ -5,6 +5,7 @@
     ./venv/bin/python binanace/example.py
 """
 import sys
+import time
 from pathlib import Path
 from time import process_time
 
@@ -34,7 +35,7 @@ PRED_LEN = 5          # 预测未来 5 根 K 线
 EPOCHS = 50
 PER_EPOCHS=5
 TRADE_FEE_RATE=0.0005
-STOP_MARKET_RATE=0.1
+STOP_MARKET_RATE=1
 LABEL='future'
 MODEL_NAME=str(LIMIT)+"_"+INTERVAL+"_"+str(EPOCHS)+"_"+str(PER_EPOCHS)+"_"+str(SEQ_LEN)+"_"+str(PRED_LEN)+"_"+str(TRADE_FEE_RATE)+"_"+LABEL+"_"+"model.pt"
 MODEL_PATH = Path(__file__).parent / MODEL_NAME
@@ -95,6 +96,7 @@ def simBTC():
     money_list=[]
     money_list.append({"date":end_time,"money":0,"clear_money":0})
     while end_time<datetime.now():
+        time.sleep(1)
         kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(end_time.timestamp()) * 1000)
         raw_data=kline_df.copy()
         # 2. 特征标准化（与 dline/example.py 相同流程）
@@ -174,6 +176,11 @@ def state(restored,quant,close_price):
         else:
             return 0
     else:
-        return 0
+        if quant>0:
+            return -1
+        elif quant<0:
+            return 1
+        else:
+            return 0
 if __name__ == "__main__":
     simBTC()
