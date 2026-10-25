@@ -94,9 +94,10 @@ def simBTC():
     num=0
     quant=0
     money_list=[]
+    control_history=[]
     money_list.append({"date":end_time,"money":0,"clear_money":0})
     while end_time<datetime.now():
-        time.sleep(1)
+        time.sleep(0.1)
         kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(end_time.timestamp()) * 1000)
         raw_data=kline_df.copy()
         # 2. 特征标准化（与 dline/example.py 相同流程）
@@ -139,14 +140,7 @@ def simBTC():
             start_index,
             priceKeys=PRICE_KEYS,
         )
-        quant=ASSERT.quant
-        price=ASSERT.price
-        if quant>0 and price*(1-STOP_MARKET_RATE)>=kline_df['close'].to_numpy()[-1]:
-            change_quant=-1*quant
-        elif quant<0 and price*(1+STOP_MARKET_RATE)<=kline_df['close'].to_numpy()[-1]:
-            change_quant=-1*quant
-        else:
-            change_quant=state(restored,quant,kline_df['close'].to_numpy()[-1])
+        change_quant, quant = get_ori_change_quant(kline_df, restored)
         if change_quant!=0:
             quant=quant+change_quant
             ASSERT.quant=quant
@@ -156,12 +150,33 @@ def simBTC():
                 clear_money -= change_quant * (1 - TRADE_FEE_RATE) * kline_df['close'].to_numpy()[-1]
             else:
                 clear_money -= change_quant * (1 + TRADE_FEE_RATE) * kline_df['close'].to_numpy()[-1]
-        print(f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {state},money is {money},clear_money is {clear_money},quant is {ASSERT.quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
+        control_history.loc[len(control_history)]=[kline_df['date'].to_numpy()[-1],change_quant]
+        print(f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {change_quant},money is {money},clear_money is {clear_money},quant is {ASSERT.quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
+        control_history.append({"date":end_time,"change":change_quant})
         end_time=end_time+timedelta(hours=4)
         money_list.append({"date":end_time,"money":money+ASSERT.quant*kline_df['close'].to_numpy()[-1],"clear_money":clear_money+ASSERT.quant*kline_df['close'].to_numpy()[-1]})
         num+=1
+    control_history=pd.DataFrame(control_history)
+    control_history.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_change_history.csv")
     money_df=pd.DataFrame(money_list)
     money_df.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_money.csv")
+
+
+def get_change_quant(kline_df,restored):
+    quant = ASSERT.quant
+    price = ASSERT.price
+    if quant > 0 and price * (1 - STOP_MARKET_RATE) >= kline_df['close'].to_numpy()[-1]:
+        change_quant = -1 * quant
+    elif quant < 0 and price * (1 + STOP_MARKET_RATE) <= kline_df['close'].to_numpy()[-1]:
+        change_quant = -1 * quant
+    else:
+        change_quant = state(restored, quant, kline_df['close'].to_numpy()[-1])
+    return change_quant, quant
+def get_ori_change_quant(kline_df,restored):
+    quant = ASSERT.quant
+    change_quant = state(restored, quant, kline_df['close'].to_numpy()[-1])
+    return change_quant, quant
+
 def state(restored,quant,close_price):
     min_close=min(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
     max_close=max(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
