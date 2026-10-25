@@ -140,20 +140,18 @@ def simBTC():
             start_index,
             priceKeys=PRICE_KEYS,
         )
-        change_quant, quant = get_ori_change_quant(kline_df, restored)
+        change_quant = get_ori_change_quant(kline_df,quant, restored)
         if change_quant!=0:
             quant=quant+change_quant
-            ASSERT.quant=quant
-            ASSERT.price=kline_df['close'].to_numpy()[-1]
             money -= change_quant * kline_df['close'].to_numpy()[-1]
             if change_quant<=0:
                 clear_money -= change_quant * (1 - TRADE_FEE_RATE) * kline_df['close'].to_numpy()[-1]
             else:
                 clear_money -= change_quant * (1 + TRADE_FEE_RATE) * kline_df['close'].to_numpy()[-1]
-        print(f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {change_quant},money is {money},clear_money is {clear_money},quant is {ASSERT.quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
+        print(f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {change_quant},money is {money},clear_money is {clear_money},quant is {quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
         control_history.append({"date":end_time,"change":change_quant})
         end_time=end_time+timedelta(hours=4)
-        money_list.append({"date":end_time,"money":money+ASSERT.quant*kline_df['close'].to_numpy()[-1],"clear_money":clear_money+ASSERT.quant*kline_df['close'].to_numpy()[-1]})
+        money_list.append({"date":end_time,"money":money+quant*kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*kline_df['close'].to_numpy()[-1]})
         num+=1
     control_history=pd.DataFrame(control_history)
     control_history.to_csv(f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_change_history.csv")
@@ -171,10 +169,9 @@ def get_change_quant(kline_df,restored):
     else:
         change_quant = state(restored, quant, kline_df['close'].to_numpy()[-1])
     return change_quant, quant
-def get_ori_change_quant(kline_df,restored):
-    quant = ASSERT.quant
+def get_ori_change_quant(kline_df,quant,restored):
     change_quant = state(restored, quant, kline_df['close'].to_numpy()[-1])
-    return change_quant, quant
+    return change_quant
 
 def state(restored,quant,close_price):
     min_close=min(restored['close'][0],restored['close'][1],restored['close'][2],restored['close'][3],restored['close'][4])
@@ -190,11 +187,6 @@ def state(restored,quant,close_price):
         else:
             return 0
     else:
-        if quant>0:
-            return -1
-        elif quant<0:
-            return 1
-        else:
-            return 0
+        return 0
 if __name__ == "__main__":
     simBTC()
