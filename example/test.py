@@ -97,7 +97,7 @@ def simBTC():
     control_history=[]
     money_list.append({"date":end_time,"money":0,"clear_money":0})
     while end_time<datetime.now():
-        time.sleep(0.1)
+        time.sleep(0.2)
         kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(end_time.timestamp()) * 1000)
         raw_data=kline_df.copy()
         # 2. 特征标准化（与 dline/example.py 相同流程）
