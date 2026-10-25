@@ -149,7 +149,7 @@ def simBTC():
             else:
                 clear_money -= change_quant * (1 + TRADE_FEE_RATE) * kline_df['close'].to_numpy()[-1]
         print(f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {change_quant},money is {money},clear_money is {clear_money},quant is {quant},actual clse is {kline_df['close'].to_numpy()[-1]}")
-        control_history.append({"date":end_time,"change":change_quant})
+        control_history.append({"date":end_time,"change":change_quant,'open':kline_df['open'].to_numpy()[-1],'high':kline_df['high'].to_numpy()[-1],'low':kline_df['low'].to_numpy()[-1],'close':kline_df['close'].to_numpy()[-1]})
         end_time=end_time+timedelta(hours=4)
         money_list.append({"date":end_time,"money":money+quant*kline_df['close'].to_numpy()[-1],"clear_money":clear_money+quant*kline_df['close'].to_numpy()[-1]})
         num+=1
