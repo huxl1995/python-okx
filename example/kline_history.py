@@ -26,13 +26,91 @@ def zoom_mode_args(mode: str) -> dict:
     x_fixed = mode == "y"
     y_fixed = mode == "x"
     dragmode = "pan" if mode == "pan" else "zoom"
-    return {
+    args = {
         "dragmode": dragmode,
         "xaxis.fixedrange": x_fixed,
         "xaxis2.fixedrange": x_fixed,
         "yaxis.fixedrange": y_fixed,
         "yaxis2.fixedrange": y_fixed,
     }
+    if mode in ("y", "xy"):
+        args["meta.yAuto"] = False
+    return args
+
+
+Y_AUTO_JS = """
+var gd = document.getElementById('{plot_id}');
+var applying = false;
+
+function parseX(v) {
+    if (v === undefined || v === null) return null;
+    if (typeof v === 'number') return v;
+    var t = Date.parse(v);
+    return isNaN(t) ? null : t;
+}
+function yAutoOn() {
+    var meta = (gd.layout && gd.layout.meta) || {};
+    return meta.yAuto === true;
+}
+function isXChange(e) {
+    if (!e) return false;
+    if (e['meta.yAuto'] === true) return true;
+    for (var k in e) {
+        if (Object.prototype.hasOwnProperty.call(e, k) && k.indexOf('xaxis') === 0) return true;
+    }
+    return false;
+}
+function visibleMinMax(xs, lows, highs, x0, x1) {
+    var minV = Infinity, maxV = -Infinity, n = 0;
+    for (var i = 0; i < xs.length; i++) {
+        var xi = parseX(xs[i]);
+        if (x0 !== null && (xi < x0 || xi > x1)) continue;
+        var lo = lows[i], hi = highs[i];
+        if (lo == null && hi == null) continue;
+        if (lo != null && lo < minV) minV = lo;
+        if (hi != null && hi > maxV) maxV = hi;
+        n++;
+    }
+    return n ? [minV, maxV] : null;
+}
+function fitY() {
+    if (applying || !yAutoOn()) return;
+    var layout = gd._fullLayout || gd.layout || {};
+    var xr = (layout.xaxis && layout.xaxis.range) ? layout.xaxis.range : null;
+    var x0 = xr ? parseX(xr[0]) : null;
+    var x1 = xr ? parseX(xr[1]) : null;
+    var candle = null, pos = null;
+    (gd.data || []).forEach(function(tr) {
+        if (tr && tr.type === 'candlestick') candle = tr;
+        if (tr && tr.name === '累计仓位') pos = tr;
+    });
+    if (!candle) return;
+    var price = visibleMinMax(candle.x, candle.low, candle.high, x0, x1);
+    if (!price) return;
+    var pad = (price[1] - price[0]) * 0.06 || Math.abs(price[1]) * 0.01;
+    var updates = {
+        'yaxis.autorange': false,
+        'yaxis.range': [price[0] - pad, price[1] + pad]
+    };
+    if (pos) {
+        var pr = visibleMinMax(pos.x, pos.y, pos.y, x0, x1);
+        if (pr) {
+            var pp = (pr[1] - pr[0]) * 0.12 || 0.5;
+            updates['yaxis2.autorange'] = false;
+            updates['yaxis2.range'] = [pr[0] - pp, pr[1] + pp];
+        }
+    }
+    applying = true;
+    Plotly.relayout(gd, updates).then(function() { applying = false; });
+}
+function onRelayout(e) {
+    if (applying || !yAutoOn() || !isXChange(e)) return;
+    fitY();
+}
+gd.on('plotly_relayout', onRelayout);
+gd.on('plotly_relayouting', onRelayout);
+setTimeout(fitY, 0);
+"""
 
 
 def load_history(csv_path: Path) -> pd.DataFrame:
@@ -179,9 +257,10 @@ def build_figure(df: pd.DataFrame) -> go.Figure:
         template="plotly_dark",
         hovermode="x unified",
         dragmode="zoom",
+        meta=dict(yAuto=True),
         legend=dict(orientation="h", yanchor="bottom", y=1.08, x=0, font=dict(size=11)),
-        margin=dict(l=60, r=30, t=120, b=40),
-        height=900,
+        margin=dict(l=60, r=30, t=136, b=40),
+        height=920,
         updatemenus=[
             dict(
                 type="buttons",
@@ -189,7 +268,7 @@ def build_figure(df: pd.DataFrame) -> go.Figure:
                 showactive=True,
                 active=0,
                 x=0,
-                y=1.18,
+                y=1.20,
                 xanchor="left",
                 yanchor="top",
                 bgcolor="#333",
@@ -201,15 +280,40 @@ def build_figure(df: pd.DataFrame) -> go.Figure:
                     dict(label="缩放 XY", method="relayout", args=[zoom_mode_args("xy")]),
                     dict(label="平移", method="relayout", args=[zoom_mode_args("pan")]),
                 ],
-            )
+            ),
+            dict(
+                type="buttons",
+                direction="right",
+                showactive=True,
+                active=0,
+                x=0,
+                y=1.12,
+                xanchor="left",
+                yanchor="top",
+                bgcolor="#333",
+                bordercolor="#666",
+                font=dict(color="#eee", size=12),
+                buttons=[
+                    dict(
+                        label="Y自适应 开",
+                        method="relayout",
+                        args=[{**zoom_mode_args("x"), "meta.yAuto": True}],
+                    ),
+                    dict(
+                        label="Y自适应 关",
+                        method="relayout",
+                        args=[{"meta.yAuto": False}],
+                    ),
+                ],
+            ),
         ],
         annotations=[
             dict(
-                text="缩放 X：只改时间轴；缩放 Y：只改价格轴；滚轮与框选都受当前模式限制",
+                text="Y自适应：价格轴随可见K线高低自动调整；点「缩放 Y」会关闭自适应",
                 xref="paper",
                 yref="paper",
                 x=1,
-                y=1.14,
+                y=1.12,
                 xanchor="right",
                 yanchor="bottom",
                 showarrow=False,
@@ -281,6 +385,7 @@ def main():
         str(html_path),
         include_plotlyjs=True,
         full_html=True,
+        post_script=Y_AUTO_JS,
         config=plot_config,
     )
     print(f"已写入 {html_path}")
