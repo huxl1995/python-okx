@@ -48,31 +48,31 @@ def calculate_included_zscore(current_val, history_list):
     std = np.std(arr, ddof=1)  # 币安及Pandas默认的样本标准差
     return (current_val - mean) / std if std != 0 else 0.0
 
+if __name__=='__main__':
+    # —— 测试开始 ——
+    #prices = [100.0, 102.0, 98.0, 105.0, 95.0]
+    prices = [82374.0, 82350.0, 82195.3, 82088.0, 82260.4,82598.8,81320.1]
 
-# —— 测试开始 ——
-#prices = [100.0, 102.0, 98.0, 105.0, 95.0]
-prices = [82374.0, 82350.0, 82195.3, 82088.0, 82260.4,82598.8,81320.1]
+    W = 4
+    restorer = IncludedSelfZScoreRestorerFixed(window=W)
 
-W = 4
-restorer = IncludedSelfZScoreRestorerFixed(window=W)
+    # 先用前 W-1 个数据初始化历史窗口
+    for p in prices[: W - 1]:
+        restorer.push_history(p)
 
-# 先用前 W-1 个数据初始化历史窗口
-for p in prices[: W - 1]:
-    restorer.push_history(p)
+    print("--- 修正后的 Z-Score 逆向还原测试 ---")
+    for today_price in prices[W - 1 :]:
+        # 1. 计算包含自身的 Z-Score
+        current_zscore = calculate_included_zscore(
+            today_price, restorer.history_window
+        )
 
-print("--- 修正后的 Z-Score 逆向还原测试 ---")
-for today_price in prices[W - 1 :]:
-    # 1. 计算包含自身的 Z-Score
-    current_zscore = calculate_included_zscore(
-        today_price, restorer.history_window
-    )
+        # 2. 用修正后的公式进行还原
+        restored_p = restorer.restore_today_value(current_zscore)
 
-    # 2. 用修正后的公式进行还原
-    restored_p = restorer.restore_today_value(current_zscore)
+        print(
+            f"实际原始值: {today_price:<6} -> 算得Z-Score: {current_zscore:.4f} -> 逆向还原值: {restored_p:.1f}"
+        )
 
-    print(
-        f"实际原始值: {today_price:<6} -> 算得Z-Score: {current_zscore:.4f} -> 逆向还原值: {restored_p:.1f}"
-    )
-
-    # 3. 步进更新历史窗口
-    restorer.push_history(today_price)
+        # 3. 步进更新历史窗口
+        restorer.push_history(today_price)

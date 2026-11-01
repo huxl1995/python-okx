@@ -86,10 +86,10 @@ if __name__=="__main__":
     rt_stat = RealtimeRollingZScore(window=windows)
     in_stat=IncludedSelfZScoreRestorerFixed(window=windows)
     zscore_list=[]
-    for i in range (windows-1):
-        in_stat.push_history(kline_df['open'][i])
-        rt_stat.update(kline_df['open'][i])
-    for i in range(windows-1,len(kline_df['open'])):
+    # for i in range (windows-1):
+    #     in_stat.push_history(kline_df['open'][i])
+    #     rt_stat.update(kline_df['open'][i])
+    for i in range(0,len(kline_df['open'])):
         #zscore_value1=calculate_included_zscore(price,in_stat.history_window)
         zscore_value=rt_stat.update(kline_df['open'][i])
         orivalue=in_stat.restore_today_value(zscore_value)
