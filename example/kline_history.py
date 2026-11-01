@@ -1,5 +1,5 @@
 """
-读取 change_history CSV，绘制可缩放 K 线：买卖点、均线、视野内 Y 轴自适应。
+读取 change_history CSV，绘制可缩放 K 线：买卖点、均线，X / Y 轴可独立缩放。
 
 运行方式（在 example 目录或项目根目录）:
     python example/kline_history.py
@@ -20,56 +20,19 @@ MA_COLORS = {
     60: "#c17ecf",
 }
 
-Y_AUTOSCALE_JS = """
-var gd = document.getElementById('{plot_id}');
-function parseX(v) {
-    if (v === undefined || v === null) return null;
-    if (typeof v === 'number') return v;
-    var t = Date.parse(v);
-    return isNaN(t) ? null : t;
-}
-function visibleYRange() {
-    var layout = gd.layout || {};
-    var xr = (layout.xaxis && layout.xaxis.range) ? layout.xaxis.range : null;
-    var x0 = xr ? parseX(xr[0]) : null;
-    var x1 = xr ? parseX(xr[1]) : null;
-    var lows = [], highs = [];
-    (gd.data || []).forEach(function(tr) {
-        if (!tr || tr.visible === false || tr.visible === 'legendonly') return;
-        var xs = tr.x || [];
-        if (tr.type === 'candlestick') {
-            var lo = tr.low || [], hi = tr.high || [];
-            for (var i = 0; i < xs.length; i++) {
-                var xi = parseX(xs[i]);
-                if (x0 !== null && (xi < x0 || xi > x1)) continue;
-                if (lo[i] != null) lows.push(lo[i]);
-                if (hi[i] != null) highs.push(hi[i]);
-            }
-        } else if (tr.yaxis !== 'y2') {
-            var ys = tr.y || [];
-            for (var j = 0; j < xs.length; j++) {
-                var xj = parseX(xs[j]);
-                if (x0 !== null && (xj < x0 || xj > x1)) continue;
-                if (ys[j] != null) { lows.push(ys[j]); highs.push(ys[j]); }
-            }
-        }
-    });
-    if (!lows.length) return;
-    var minY = Math.min.apply(null, lows);
-    var maxY = Math.max.apply(null, highs);
-    var pad = (maxY - minY) * 0.08 || maxY * 0.01;
-    Plotly.relayout(gd, {'yaxis.range': [minY - pad, maxY + pad]});
-}
-gd.on('plotly_relayout', function(e) {
-    if (!e) return;
-    if (e['yaxis.range'] || e['yaxis.range[0]'] || e['yaxis.autorange']) return;
-    if (e['xaxis.range'] || e['xaxis.range[0]'] || e['xaxis.autorange']
-        || e['xaxis.rangeslider.range'] || e['xaxis.rangeslider.range[0]']) {
-        visibleYRange();
+
+def zoom_mode_args(mode: str) -> dict:
+    """通过 fixedrange 把框选/滚轮限制在单轴或双轴。"""
+    x_fixed = mode == "y"
+    y_fixed = mode == "x"
+    dragmode = "pan" if mode == "pan" else "zoom"
+    return {
+        "dragmode": dragmode,
+        "xaxis.fixedrange": x_fixed,
+        "xaxis2.fixedrange": x_fixed,
+        "yaxis.fixedrange": y_fixed,
+        "yaxis2.fixedrange": y_fixed,
     }
-});
-gd.on('plotly_legendclick', function() { setTimeout(visibleYRange, 0); });
-"""
 
 
 def load_history(csv_path: Path) -> pd.DataFrame:
@@ -200,6 +163,13 @@ def build_figure(df: pd.DataFrame) -> go.Figure:
         col=1,
     )
 
+    price_min = float(df["low"].min())
+    price_max = float(df["high"].max())
+    price_pad = (price_max - price_min) * 0.06 or price_max * 0.01
+    pos_min = float(df["position"].min())
+    pos_max = float(df["position"].max())
+    pos_pad = (pos_max - pos_min) * 0.12 or 0.5
+
     fig.update_layout(
         title=dict(
             text=f"BTCUSDT 4h K线  |  买入 {len(buys)} 次  卖出 {len(sells)} 次  |  共 {len(df)} 根",
@@ -209,12 +179,47 @@ def build_figure(df: pd.DataFrame) -> go.Figure:
         template="plotly_dark",
         hovermode="x unified",
         dragmode="zoom",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, font=dict(size=11)),
-        margin=dict(l=60, r=30, t=80, b=40),
-        height=860,
+        legend=dict(orientation="h", yanchor="bottom", y=1.08, x=0, font=dict(size=11)),
+        margin=dict(l=60, r=30, t=120, b=40),
+        height=900,
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="right",
+                showactive=True,
+                active=0,
+                x=0,
+                y=1.18,
+                xanchor="left",
+                yanchor="top",
+                bgcolor="#333",
+                bordercolor="#666",
+                font=dict(color="#eee", size=12),
+                buttons=[
+                    dict(label="缩放 X", method="relayout", args=[zoom_mode_args("x")]),
+                    dict(label="缩放 Y", method="relayout", args=[zoom_mode_args("y")]),
+                    dict(label="缩放 XY", method="relayout", args=[zoom_mode_args("xy")]),
+                    dict(label="平移", method="relayout", args=[zoom_mode_args("pan")]),
+                ],
+            )
+        ],
+        annotations=[
+            dict(
+                text="缩放 X：只改时间轴；缩放 Y：只改价格轴；滚轮与框选都受当前模式限制",
+                xref="paper",
+                yref="paper",
+                x=1,
+                y=1.14,
+                xanchor="right",
+                yanchor="bottom",
+                showarrow=False,
+                font=dict(size=11, color="#aaa"),
+            )
+        ],
     )
     fig.update_xaxes(
         type="date",
+        fixedrange=False,
         rangeslider=dict(visible=False),
         rangeselector=dict(
             buttons=[
@@ -234,10 +239,30 @@ def build_figure(df: pd.DataFrame) -> go.Figure:
         row=1,
         col=1,
     )
-    fig.update_xaxes(type="date", rangeslider=dict(visible=True, thickness=0.06), row=2, col=1)
-    fig.update_yaxes(title_text="价格", fixedrange=False, autorange=True, row=1, col=1)
-    fig.update_yaxes(title_text="仓位", fixedrange=False, autorange=True, row=2, col=1)
-    fig.update_xaxes(title_text="时间", row=2, col=1)
+    fig.update_xaxes(
+        type="date",
+        fixedrange=False,
+        rangeslider=dict(visible=True, thickness=0.06),
+        title_text="时间",
+        row=2,
+        col=1,
+    )
+    fig.update_yaxes(
+        title_text="价格",
+        fixedrange=True,
+        autorange=False,
+        range=[price_min - price_pad, price_max + price_pad],
+        row=1,
+        col=1,
+    )
+    fig.update_yaxes(
+        title_text="仓位",
+        fixedrange=True,
+        autorange=False,
+        range=[pos_min - pos_pad, pos_max + pos_pad],
+        row=2,
+        col=1,
+    )
     return fig
 
 
@@ -246,19 +271,20 @@ def main():
     df = load_history(csv_path)
     fig = build_figure(df)
     html_path = Path(__file__).resolve().parent / HTML_NAME
+    plot_config = {
+        "scrollZoom": True,
+        "displaylogo": False,
+        "doubleClick": "reset",
+        "modeBarButtonsToAdd": ["drawline", "eraseshape"],
+    }
     fig.write_html(
         str(html_path),
         include_plotlyjs=True,
         full_html=True,
-        post_script=Y_AUTOSCALE_JS,
-        config={
-            "scrollZoom": True,
-            "displaylogo": False,
-            "modeBarButtonsToAdd": ["drawline", "eraseshape"],
-        },
+        config=plot_config,
     )
     print(f"已写入 {html_path}")
-    fig.show(config={"scrollZoom": True, "displaylogo": False})
+    fig.show(config=plot_config)
 
 
 if __name__ == "__main__":
