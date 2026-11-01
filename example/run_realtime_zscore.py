@@ -4,7 +4,7 @@
 使用 IncludedSelfZScoreRestorerFixed 将预测 Z-Score 逆归一化为价格。
 
 运行方式（在项目根目录）:
-    ./venv/bin/python example/test_realtime_zscore.py
+    ./venv/bin/python example/run_realtime_zscore.py
 """
 import sys
 import time
