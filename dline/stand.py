@@ -18,9 +18,9 @@ def meanAndStd(column: pd.Series) -> tuple[float, float]:
 def rollingZScoreStand(df, windowSize, key):
     # 3. 计算滚动的均值和标准差 (注意：closed='left' 严格防止时间穿越，即今天的数据不参与今天均值的计算)
     df[key+"Rolling_Mean"] = (
-        df[key].rolling(window=windowSize, closed="left").mean()
+        df[key].rolling(window=windowSize, closed="right").mean()
     )
-    df[key+"Rolling_Std"] = df[key].rolling(window=windowSize, closed="left").std()
+    df[key+"Rolling_Std"] = df[key].rolling(window=windowSize, closed="right").std()
     removeOverRecord(df,key)
     # 4. 执行滚动 Z-Score 计算
     # 加 1e-8 防止复牌或横盘时标准差为 0 导致除以 0 报错

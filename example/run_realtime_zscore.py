@@ -30,10 +30,10 @@ from binanace.future.future_klines import fetch_klines
 # ---------- 参数配置 ----------
 SYMBOL = "BTCUSDT"
 INTERVAL = "4h"       # K 线周期: 1m, 5m, 1h, 1d 等
-LIMIT = 150          # 拉取条数（Binance 单次最多 1000）
-SEQ_LEN = 15
+LIMIT = 50          # 拉取条数（Binance 单次最多 1000）
+SEQ_LEN = 10
 WINDOW_SIZE = SEQ_LEN      # 滚动 Z-Score 窗口# 输入序列长度（用过去 30 根 K 线）
-PRED_LEN = 5          # 预测未来 5 根 K 线
+PRED_LEN = 3          # 预测未来 5 根 K 线
 EPOCHS = 50
 PER_EPOCHS = 5
 TRADE_FEE_RATE = 0.0005
@@ -45,12 +45,16 @@ MODEL_NAME = (
     + "_" + LABEL + "_" + "model.pt"
 )
 MODEL_PATH = Path(__file__).parent / MODEL_NAME
+# FEATURE_COLUMNS = [
+#     "openScaled", "highScaled", "lowScaled", "closeScaled",
+#     "dateMonthSin", "dateMonthCos",
+#     "dateDaySin", "dateDayCos",
+#     "dateHourSin", "dateHourCos",
+#     "volumeLogScaled",
+# ]
 FEATURE_COLUMNS = [
     "openScaled", "highScaled", "lowScaled", "closeScaled",
-    "dateMonthSin", "dateMonthCos",
-    "dateDaySin", "dateDayCos",
-    "dateHourSin", "dateHourCos",
-    "volumeLogScaled",
+    "volumeLogScaled"
 ]
 PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 
@@ -229,12 +233,12 @@ def get_change_quant(kline_df, restored):
     elif quant < 0 and price * (1 + STOP_MARKET_RATE) <= kline_df["close"].to_numpy()[-1]:
         change_quant = -1 * quant
     else:
-        change_quant = state(restored, quant, kline_df["close"].to_numpy()[-1])
+        change_quant = state3(restored, quant, kline_df["close"].to_numpy()[-1])
     return change_quant, quant
 
 
 def get_ori_change_quant(kline_df, quant, restored):
-    change_quant = state(restored, quant, kline_df["close"].to_numpy()[-1])
+    change_quant = state3(restored, quant, kline_df["close"].to_numpy()[-1])
     return change_quant
 
 
@@ -253,6 +257,26 @@ def state(restored, quant, close_price):
             return 0
     else:
         return 0
+def state3(restored, quant, close_price):
+    min_close = min(restored["close"][0], restored["close"][1], restored["close"][2])
+    max_close = max(restored["close"][0], restored["close"][1], restored["close"][2])
+    if close_price >= max_close:
+        if quant >= 0:
+            return -1
+        else:
+            return 0
+    elif close_price <= min_close:
+        if quant <= 0:
+            return 1
+        else:
+            return 0
+    else:
+        if quant==1:
+            return -1
+        elif quant == -1:
+            return 1
+        else:
+            return 0
 
 
 if __name__ == "__main__":
