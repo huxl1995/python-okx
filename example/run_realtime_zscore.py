@@ -26,6 +26,7 @@ from dline.stand import CSNStand, Type
 from dline.realtimeRollingZScore import RealtimeRollingZScore
 from dline.includedSelfZScoreRestorer import IncludedSelfZScoreRestorerFixed
 from binanace.future.future_klines import fetch_klines
+from decimal import Decimal, ROUND_FLOOR
 
 # ---------- 参数配置 ----------
 SYMBOL = "BTCUSDT"
@@ -57,8 +58,8 @@ FEATURE_COLUMNS = [
     "volumeLogScaled"
 ]
 PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
-
-
+MONEY = Decimal('100000')
+CLEAR_MONEY = Decimal('100000')
 class Assert:
     price = 0
     quant = 0
@@ -155,10 +156,9 @@ def simBTC():
     )
     init_model_name = MODEL_NAME + ".init"
     shutil.copy(MODEL_PATH, Path(__file__).parent / init_model_name)
-    money = 0
-    clear_money = 0
     num = 0
     quant = 0
+    clear_quant=0
     money_list = []
     control_history = []
     money_list.append({"date": end_time, "money": 0, "clear_money": 0})
@@ -188,16 +188,23 @@ def simBTC():
             PRICE_KEYS,
         )
         change_quant = get_ori_change_quant(kline_df, quant, restored)
+        clear_change_quant=state_clear(restored,clear_quant,kline_df["close"].to_numpy()[-1])
+        global MONEY
+        global CLEAR_MONEY
         if change_quant != 0:
             quant = quant + change_quant
-            money -= change_quant * kline_df["close"].to_numpy()[-1]
+            MONEY = MONEY- change_quant * Decimal(kline_df["close"].to_numpy()[-1])
+        if clear_change_quant!=0:
+            change_quant = change_quant + clear_change_quant
             if change_quant <= 0:
-                clear_money -= change_quant * (1 - TRADE_FEE_RATE) * kline_df["close"].to_numpy()[-1]
+                CLEAR_MONEY = CLEAR_MONEY- clear_change_quant * Decimal((1 - TRADE_FEE_RATE) * kline_df["close"].to_numpy()[-1])
             else:
-                clear_money -= change_quant * (1 + TRADE_FEE_RATE) * kline_df["close"].to_numpy()[-1]
+                CLEAR_MONEY = CLEAR_MONEY- clear_change_quant * Decimal((1 + TRADE_FEE_RATE) * kline_df["close"].to_numpy()[-1])
+        money_str=str(MONEY)
+        clear_money_str=str(CLEAR_MONEY)
         print(
             f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {change_quant},"
-            f"money is {money},clear_money is {clear_money},quant is {quant},"
+            f"money is {money_str},quant is {quant},clear state is {clear_change_quant},clear_money is {clear_money_str},clear quant is {clear_quant},"
             f"actual clse is {kline_df['close'].to_numpy()[-1]}"
         )
         control_history.append({
@@ -211,8 +218,8 @@ def simBTC():
         end_time = end_time + timedelta(hours=4)
         money_list.append({
             "date": end_time,
-            "money": money + quant * kline_df["close"].to_numpy()[-1],
-            "clear_money": clear_money + quant * kline_df["close"].to_numpy()[-1],
+            "money": str(MONEY + quant * Decimal(kline_df["close"].to_numpy()[-1])),
+            "clear_money": str(CLEAR_MONEY + quant * Decimal(kline_df["close"].to_numpy()[-1])),
         })
         num += 1
     control_history = pd.DataFrame(control_history)
@@ -260,21 +267,49 @@ def state(restored, quant, close_price):
 def state3(restored, quant, close_price):
     min_close = min(restored["close"][0], restored["close"][1], restored["close"][2])
     max_close = max(restored["close"][0], restored["close"][1], restored["close"][2])
-    if close_price >= max_close:
-        if quant >= 0:
-            return -1
+    if close_price > max_close:
+        if quant > 0:
+            return -1*quant
+        elif quant==0:
+            return -1*(MONEY/Decimal(close_price)).quantize(Decimal('0.0001'),ROUND_FLOOR)
         else:
             return 0
-    elif close_price <= min_close:
+    elif close_price < min_close:
         if quant <= 0:
-            return 1
+            return -1*quant
+        elif quant==0:
+            return (MONEY/Decimal(close_price)).quantize(Decimal('0.0001'),ROUND_FLOOR)
         else:
             return 0
     else:
-        if quant==1:
-            return -1
-        elif quant == -1:
-            return 1
+        if quant>0:
+            return -1*quant
+        elif quant <0:
+            return quant
+        else:
+            return 0
+def state_clear(restored, quant, close_price):
+    min_close = min(restored["close"][0], restored["close"][1], restored["close"][2])
+    max_close = max(restored["close"][0], restored["close"][1], restored["close"][2])
+    if close_price > max_close:
+        if quant > 0:
+            return -1*quant
+        elif quant==0:
+            return -1*(CLEAR_MONEY/Decimal(close_price)).quantize(Decimal('0.0001'),ROUND_FLOOR)
+        else:
+            return 0
+    elif close_price < min_close:
+        if quant <= 0:
+            return -1*quant
+        elif quant==0:
+            return (CLEAR_MONEY/Decimal(close_price)).quantize(Decimal('0.0001'),ROUND_FLOOR)
+        else:
+            return 0
+    else:
+        if quant>0:
+            return -1*quant
+        elif quant <0:
+            return quant
         else:
             return 0
 
