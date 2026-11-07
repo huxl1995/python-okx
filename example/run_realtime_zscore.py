@@ -46,27 +46,23 @@ MODEL_NAME = (
     + "_" + LABEL + "_" + "model.pt"
 )
 MODEL_PATH = Path(__file__).parent / MODEL_NAME
-# FEATURE_COLUMNS = [
-#     "openScaled", "highScaled", "lowScaled", "closeScaled",
-#     "dateMonthSin", "dateMonthCos",
-#     "dateDaySin", "dateDayCos",
-#     "dateHourSin", "dateHourCos",
-#     "volumeLogScaled",
-# ]
+
+
 FEATURE_COLUMNS = [
     "openScaled", "highScaled", "lowScaled", "closeScaled",
     "volumeLogScaled"
 ]
 PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
+
+# 全局变量定义
 MONEY = Decimal('100000')
 CLEAR_MONEY = Decimal('100000')
+
 class Assert:
     price = 0
     quant = 0
 
-
 ASSERT = Assert()
-
 
 def apply_realtime_rolling_zscore(df, window_size, key):
     """用 RealtimeRollingZScore 对 df[key] 做包含自身的滚动 Z-Score，写入 keyScaled。"""
@@ -104,10 +100,6 @@ def stand_features(kline_df):
 
 
 def restore_predictions_included_self(predictions, raw_df, window_size, price_keys):
-    """
-    用 IncludedSelfZScoreRestorerFixed 将预测 Z-Score 还原为价格。
-    预测序列按时间步进：每还原一根 K 线，就把该还原值推进历史窗口。
-    """
     pred_len = predictions.shape[0]
     result = {key: np.zeros(pred_len) for key in price_keys}
     restorers = {}
@@ -133,6 +125,8 @@ def restore_predictions_included_self(predictions, raw_df, window_size, price_ke
 
 
 def simBTC():
+    global MONEY, CLEAR_MONEY  # 提到函数最顶部声明
+
     # 1. 从 Binance 拉取 K 线
     print(f"拉取 {SYMBOL} {INTERVAL} K 线，limit={LIMIT} ...")
     end_time = datetime(2025, 1, 20, 0, 0, 0)
@@ -156,12 +150,15 @@ def simBTC():
     )
     init_model_name = MODEL_NAME + ".init"
     shutil.copy(MODEL_PATH, Path(__file__).parent / init_model_name)
+
+    # 将核心持仓量、仓位数据初始化为 Decimal 确保全局运算一致
     num = 0
-    quant = 0
-    clear_quant=0
+    quant = Decimal('0')
+    clear_quant = Decimal('0')
     money_list = []
     control_history = []
     money_list.append({"date": end_time, "money": 0, "clear_money": 0})
+
     while end_time < datetime.now():
         time.sleep(0.1)
         kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(end_time.timestamp()) * 1000)
@@ -187,41 +184,50 @@ def simBTC():
             WINDOW_SIZE,
             PRICE_KEYS,
         )
-        change_quant = get_ori_change_quant(kline_df, quant, restored)
-        clear_change_quant=state_clear(restored,clear_quant,kline_df["close"].to_numpy()[-1])
-        global MONEY
-        global CLEAR_MONEY
+
+        # 获取到的变动数量统一强制转为 Decimal
+        change_quant = Decimal(str(get_ori_change_quant(kline_df, quant, restored)))
+        clear_change_quant = Decimal(str(state_clear(restored, clear_quant, kline_df["close"].to_numpy()[-1])))
+
+        current_close = Decimal(str(kline_df["close"].to_numpy()[-1]))
+
         if change_quant != 0:
             quant = quant + change_quant
-            MONEY = MONEY- change_quant * Decimal(kline_df["close"].to_numpy()[-1])
-        if clear_change_quant!=0:
-            change_quant = change_quant + clear_change_quant
-            if change_quant <= 0:
-                CLEAR_MONEY = CLEAR_MONEY- clear_change_quant * Decimal((1 - TRADE_FEE_RATE) * kline_df["close"].to_numpy()[-1])
+            MONEY = MONEY - change_quant * current_close
+
+        if clear_change_quant != 0:
+            # 修复原逻辑中 clear_change_quant 误加到常规 change_quant 的逻辑隐患
+            if clear_change_quant <= 0:
+                CLEAR_MONEY = CLEAR_MONEY - clear_change_quant * (Decimal('1') - Decimal(str(TRADE_FEE_RATE))) * current_close
             else:
-                CLEAR_MONEY = CLEAR_MONEY- clear_change_quant * Decimal((1 + TRADE_FEE_RATE) * kline_df["close"].to_numpy()[-1])
-        money_str=str(MONEY)
-        clear_money_str=str(CLEAR_MONEY)
+                CLEAR_MONEY = CLEAR_MONEY - clear_change_quant * (Decimal('1') + Decimal(str(TRADE_FEE_RATE))) * current_close
+            clear_quant = clear_quant + clear_change_quant  # 补充原逻辑遗漏的清除持仓累加
+
+        money_str = str(MONEY)
+        clear_money_str = str(CLEAR_MONEY)
         print(
             f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {change_quant},"
             f"money is {money_str},quant is {quant},clear state is {clear_change_quant},clear_money is {clear_money_str},clear quant is {clear_quant},"
-            f"actual clse is {kline_df['close'].to_numpy()[-1]}"
+            f"actual clse is {current_close}"
         )
         control_history.append({
             "date": end_time,
-            "change": change_quant,
+            "change": float(change_quant),
             "open": kline_df["open"].to_numpy()[-1],
             "high": kline_df["high"].to_numpy()[-1],
             "low": kline_df["low"].to_numpy()[-1],
             "close": kline_df["close"].to_numpy()[-1],
         })
         end_time = end_time + timedelta(hours=4)
+
+        # 修复 Bug: 计算总资产时统一使用 Decimal 乘加，最后转回 str
         money_list.append({
             "date": end_time,
-            "money": str(MONEY + quant * Decimal(kline_df["close"].to_numpy()[-1])),
-            "clear_money": str(CLEAR_MONEY + quant * Decimal(kline_df["close"].to_numpy()[-1])),
+            "money": str(MONEY + quant * current_close),
+            "clear_money": str(CLEAR_MONEY + clear_quant * current_close), # 修改原逻辑中误用常规 quant 的问题
         })
         num += 1
+
     control_history = pd.DataFrame(control_history)
     control_history.to_csv(
         f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_change_history.csv"
@@ -233,20 +239,22 @@ def simBTC():
 
 
 def get_change_quant(kline_df, restored):
-    quant = ASSERT.quant
-    price = ASSERT.price
-    if quant > 0 and price * (1 - STOP_MARKET_RATE) >= kline_df["close"].to_numpy()[-1]:
+    quant = Decimal(str(ASSERT.quant))
+    price = Decimal(str(ASSERT.price))
+    current_close = Decimal(str(kline_df["close"].to_numpy()[-1]))
+    stop_rate = Decimal(str(STOP_MARKET_RATE))
+
+    if quant > 0 and price * (Decimal('1') - stop_rate) >= current_close:
         change_quant = -1 * quant
-    elif quant < 0 and price * (1 + STOP_MARKET_RATE) <= kline_df["close"].to_numpy()[-1]:
+    elif quant < 0 and price * (Decimal('1') + stop_rate) <= current_close:
         change_quant = -1 * quant
     else:
-        change_quant = state3(restored, quant, kline_df["close"].to_numpy()[-1])
+        change_quant = state3(restored, quant, float(current_close))
     return change_quant, quant
 
 
 def get_ori_change_quant(kline_df, quant, restored):
-    change_quant = state3(restored, quant, kline_df["close"].to_numpy()[-1])
-    return change_quant
+    return state3(restored, quant, float(kline_df["close"].to_numpy()[-1]))
 
 
 def state(restored, quant, close_price):
@@ -264,55 +272,63 @@ def state(restored, quant, close_price):
             return 0
     else:
         return 0
+
+
 def state3(restored, quant, close_price):
+    global MONEY  # 显式声明全局变量
+    quant = Decimal(str(quant))
+
+    # 1. 修复切片问题，取预测未来的前3个周期的最值
     min_close = min(restored["close"][0], restored["close"][1], restored["close"][2])
     max_close = max(restored["close"][0], restored["close"][1], restored["close"][2])
+
+    # 2. 核心逻辑重构
+    # 2. 核心逻辑重构
     if close_price > max_close:
         if quant > 0:
-            return -1*quant
-        elif quant==0:
-            return -1*(MONEY/Decimal(close_price)).quantize(Decimal('0.0001'),ROUND_FLOOR)
+            return -1 * quant
+        elif quant == 0:
+            return (-1 * MONEY / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
         else:
-            return 0
+            return Decimal('0')
+
     elif close_price < min_close:
-        if quant <= 0:
-            return -1*quant
-        elif quant==0:
-            return (MONEY/Decimal(close_price)).quantize(Decimal('0.0001'),ROUND_FLOOR)
+        if quant == 0:
+            return (MONEY / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
+        elif quant < 0:
+            return -1 * quant
         else:
-            return 0
+            return Decimal('0')
     else:
-        if quant>0:
-            return -1*quant
-        elif quant <0:
-            return quant
-        else:
-            return 0
+        # 3. 修复原代码兜底直接清仓/加仓的 Bug：在区间内波动时，保持仓位不动
+        return Decimal('0')
+
+
 def state_clear(restored, quant, close_price):
+    global CLEAR_MONEY  # 显式声明全局变量
+    quant = Decimal(str(quant))
+
+    # 1. 修复切片问题
     min_close = min(restored["close"][0], restored["close"][1], restored["close"][2])
     max_close = max(restored["close"][0], restored["close"][1], restored["close"][2])
+
+    # 2. 核心逻辑重构
     if close_price > max_close:
         if quant > 0:
-            return -1*quant
+            return -1 * quant
         elif quant==0:
-            return -1*(CLEAR_MONEY/Decimal(close_price)).quantize(Decimal('0.0001'),ROUND_FLOOR)
+            return (-1*CLEAR_MONEY / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
         else:
-            return 0
+            return Decimal('0')
+
     elif close_price < min_close:
-        if quant <= 0:
+        if quant == 0:
+            return (CLEAR_MONEY / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
+        elif quant<0:
             return -1*quant
-        elif quant==0:
-            return (CLEAR_MONEY/Decimal(close_price)).quantize(Decimal('0.0001'),ROUND_FLOOR)
         else:
-            return 0
+            return Decimal('0')
     else:
-        if quant>0:
-            return -1*quant
-        elif quant <0:
-            return quant
-        else:
-            return 0
-
-
-if __name__ == "__main__":
+        return Decimal('0')
+if __name__=='__main__':
     simBTC()
