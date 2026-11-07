@@ -55,8 +55,8 @@ FEATURE_COLUMNS = [
 PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 
 # 全局变量定义
-MONEY = Decimal('100000')
-CLEAR_MONEY = Decimal('100000')
+MONEY = 0
+CLEAR_MONEY = 0
 
 class Assert:
     price = 0
@@ -187,27 +187,25 @@ def simBTC():
 
         # 获取到的变动数量统一强制转为 Decimal
         change_quant = Decimal(str(get_ori_change_quant(kline_df, quant, restored)))
-        clear_change_quant = Decimal(str(state_clear(restored, clear_quant, kline_df["close"].to_numpy()[-1])))
-
         current_close = Decimal(str(kline_df["close"].to_numpy()[-1]))
 
         if change_quant != 0:
             quant = quant + change_quant
             MONEY = MONEY - change_quant * current_close
 
-        if clear_change_quant != 0:
+        if change_quant != 0:
             # 修复原逻辑中 clear_change_quant 误加到常规 change_quant 的逻辑隐患
-            if clear_change_quant <= 0:
-                CLEAR_MONEY = CLEAR_MONEY - clear_change_quant * (Decimal('1') - Decimal(str(TRADE_FEE_RATE))) * current_close
+            if change_quant <= 0:
+                CLEAR_MONEY = CLEAR_MONEY - change_quant * (Decimal('1') - Decimal(str(TRADE_FEE_RATE))) * current_close
             else:
-                CLEAR_MONEY = CLEAR_MONEY - clear_change_quant * (Decimal('1') + Decimal(str(TRADE_FEE_RATE))) * current_close
-            clear_quant = clear_quant + clear_change_quant  # 补充原逻辑遗漏的清除持仓累加
+                CLEAR_MONEY = CLEAR_MONEY - change_quant * (Decimal('1') + Decimal(str(TRADE_FEE_RATE))) * current_close
+            clear_quant = clear_quant + change_quant  # 补充原逻辑遗漏的清除持仓累加
 
         money_str = str(MONEY)
         clear_money_str = str(CLEAR_MONEY)
         print(
             f"num is {num},time is {kline_df['date'].to_numpy()[-1]},state is {change_quant},"
-            f"money is {money_str},quant is {quant},clear state is {clear_change_quant},clear_money is {clear_money_str},clear quant is {clear_quant},"
+            f"money is {money_str},quant is {quant},clear state is {change_quant},clear_money is {clear_money_str},clear quant is {clear_quant},"
             f"actual clse is {current_close}"
         )
         control_history.append({
@@ -288,13 +286,13 @@ def state3(restored, quant, close_price):
         if quant > 0:
             return -1 * quant
         elif quant == 0:
-            return (-1 * MONEY / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
+            return (-1 * Decimal('100000') / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
         else:
             return Decimal('0')
 
     elif close_price < min_close:
         if quant == 0:
-            return (MONEY / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
+            return (Decimal('100000') / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
         elif quant < 0:
             return -1 * quant
         else:
@@ -317,13 +315,13 @@ def state_clear(restored, quant, close_price):
         if quant > 0:
             return -1 * quant
         elif quant==0:
-            return (-1*CLEAR_MONEY / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
+            return (-1*Decimal('100000') / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
         else:
             return Decimal('0')
 
     elif close_price < min_close:
         if quant == 0:
-            return (CLEAR_MONEY / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
+            return (Decimal('100000') / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
         elif quant<0:
             return -1*quant
         else:
