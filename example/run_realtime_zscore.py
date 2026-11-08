@@ -38,7 +38,8 @@ PRED_LEN = 3          # 预测未来 5 根 K 线
 EPOCHS = 100
 PER_EPOCHS = 10
 TRADE_FEE_RATE = 0.0005
-STOP_MARKET_RATE = 1
+STOP_MARKET_RATE = 0.04
+PROFIT_MARKET_RATE=0.02
 LABEL = "future_rtz"
 MODEL_NAME = (
     str(LIMIT) + "_" + INTERVAL + "_" + str(EPOCHS) + "_" + str(PER_EPOCHS)
@@ -333,6 +334,10 @@ def stop_market(kline_df, quant):
         return quant*-1,PRICE*Decimal(1+STOP_MARKET_RATE)
     elif quant>0 and Decimal(min_price)<PRICE*Decimal(1-STOP_MARKET_RATE):
         return quant*-1,PRICE*Decimal(1-STOP_MARKET_RATE)
+    elif quant<0 and Decimal(min_price)<=PRICE*Decimal(1-PROFIT_MARKET_RATE):
+        return quant*-1,PRICE*Decimal(1-PROFIT_MARKET_RATE)
+    elif quant>0 and Decimal(max_price)>=PRICE*Decimal(1+PROFIT_MARKET_RATE):
+        return quant*-1,PRICE*Decimal(1+PROFIT_MARKET_RATE)
     else:
         return 0,0
 if __name__=='__main__':
