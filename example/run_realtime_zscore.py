@@ -30,13 +30,13 @@ from decimal import Decimal, ROUND_FLOOR
 
 # ---------- 参数配置 ----------
 SYMBOL = "BTCUSDT"
-INTERVAL = "8h"       # K 线周期: 1m, 5m, 1h, 1d 等
-LIMIT = 100          # 拉取条数（Binance 单次最多 1000）
-SEQ_LEN = 20
+INTERVAL = "12h"       # K 线周期: 1m, 5m, 1h, 1d 等
+LIMIT = 150          # 拉取条数（Binance 单次最多 1000）
+SEQ_LEN = 30
 WINDOW_SIZE = SEQ_LEN      # 滚动 Z-Score 窗口# 输入序列长度（用过去 30 根 K 线）
 PRED_LEN = 3          # 预测未来 5 根 K 线
-EPOCHS = 50
-PER_EPOCHS = 5
+EPOCHS = 100
+PER_EPOCHS = 10
 TRADE_FEE_RATE = 0.0005
 STOP_MARKET_RATE = 1
 LABEL = "future_rtz"
@@ -221,7 +221,7 @@ def simBTC():
             "money": str(MONEY + quant * current_close),
             "clear_money": str(CLEAR_MONEY + quant * current_close), # 修改原逻辑中误用常规 quant 的问题
         })
-        end_time = end_time + timedelta(hours=8)
+        end_time = end_time + timedelta(hours=12)
         num += 1
 
     control_history = pd.DataFrame(control_history)
