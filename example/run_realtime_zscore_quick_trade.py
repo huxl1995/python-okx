@@ -366,8 +366,9 @@ def quick_trade(quant,price,take_profit_rate,stop_lose_rate,start_time):
 def quick_trade(quant,price,take_profit_rate,stop_lose_rate,start_time):
     if quant ==0:
         return 0,0
+    start_time=start_time+timedelta(hours=4)
     end_time=start_time+timedelta(hours=4)
-    end_time=end_time-timedelta(seconds=15)
+    end_time=end_time-timedelta(minutes=1)
     kline=fetch_klines(symbol=SYMBOL,interval='1m',limit=1000,start_time=int(start_time.timestamp())*1000,end_time=int(end_time.timestamp())*1000)
     if quant>0:
         take_profit_price=price*Decimal(1+take_profit_rate)
