@@ -133,6 +133,61 @@ def train_and_save(
     )
     model.eval()
     return model
+def train_only(
+    data,
+    seq_len=30,
+    pred_len=5,
+    epochs=10,
+    batch_size=32,
+    lr=5e-5,
+    log=True
+):
+    """
+    训练 DLinearForStock 模型并保存到文件。
+
+    Args:
+        data: 训练数据，numpy 数组 (样本数, 特征数) 或 csv 文件路径
+        save_path: 模型保存路径
+        seq_len: 输入序列长度
+        pred_len: 预测序列长度
+        epochs: 训练轮数
+        batch_size: 批次大小
+        lr: 学习率
+
+    Returns:
+        训练完成的 DLinearForStock 模型
+    """
+    if isinstance(data, str):
+        data = np.loadtxt(data, delimiter=",", dtype=np.float64)
+
+    if data.ndim != 2:
+        raise ValueError("data 形状应为 (样本数, 特征数)")
+
+    num_features = data.shape[1]
+    if len(data) < seq_len + pred_len:
+        raise ValueError(f"训练数据长度不足，至少需要 {seq_len + pred_len} 条样本")
+
+    dataset = StockDataset(data, seq_len, pred_len)
+    train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    model = DLinearForStock(seq_len=seq_len, pred_len=pred_len, num_features=num_features)
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    model.train()
+    for epoch in range(epochs):
+        epoch_loss = 0.0
+        for batch_x, batch_y in train_loader:
+            optimizer.zero_grad()
+            outputs = model(batch_x)
+            loss = criterion(outputs, batch_y)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+    if log:
+        print(f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss / len(train_loader):.4f}")
+    model.eval()
+    return model
 def calculate(data,model,windowSize):
     preData=data[len(data)-windowSize:-1]
     preDataNp=preData[['openScaled','highScaled','lowScaled','closeScaled','dateMonthSin','dateMonthCos','dateDaySin','dateDayCos','volumeLogScaled']].to_numpy()
