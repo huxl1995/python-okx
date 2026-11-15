@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-CSV_NAME = "150_4h_50_5_15_5_0.0005_future_rtz_change_history.csv"
+CSV_NAME = "30_1d_30_5_6_3_0.0005_future_quick_trade_change_history.csv"
 HTML_NAME = "kline_chart.html"
 MA_WINDOWS = (5, 10, 20, 60)
 MA_COLORS = {
