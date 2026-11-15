@@ -40,9 +40,9 @@ PRED_LEN = 3          # 预测未来 5 根 K 线
 EPOCHS = 100
 PER_EPOCHS = 10
 TRADE_FEE_RATE = 0.0005
-STOP_MARKET_RATE = 1
+STOP_MARKET_RATE = 0.05
 PROFIT_MARKET_RATE=0.02
-SEED=35
+SEED=38
 
 LABEL = "future_rtz"
 MODEL_NAME = (
@@ -129,16 +129,7 @@ def simBTC():
         # 获取到的变动数量统一强制转为 Decimal
         change_quant = Decimal(str(get_ori_change_quant(kline_df, quant, restored)))
         current_close = Decimal(str(kline_df["close"].to_numpy()[-1]))
-        stop_change_quant,stop_price=stop_market(kline_df,quant)
-        if stop_change_quant!=0:
-            quant=quant+stop_change_quant
-            MONEY = MONEY - stop_change_quant * stop_price
-            PRICE=stop_price
-            if stop_change_quant <= 0:
-                CLEAR_MONEY = CLEAR_MONEY - stop_change_quant * (Decimal('1') - Decimal(str(TRADE_FEE_RATE))) * stop_price
-            else:
-                CLEAR_MONEY = CLEAR_MONEY - stop_change_quant * (Decimal('1') + Decimal(str(TRADE_FEE_RATE))) * stop_price
-        elif change_quant != 0:
+        if change_quant != 0:
             quant = quant + change_quant
             PRICE=current_close
             MONEY = MONEY - change_quant * current_close
