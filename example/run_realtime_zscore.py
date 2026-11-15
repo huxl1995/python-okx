@@ -10,10 +10,15 @@ import sys
 import time
 from pathlib import Path
 import shutil
+import random
 
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
+
+import torch
+
+from dline.data_stand import stand_features, restore_predictions_included_self
 
 ROOT = Path(__file__).resolve().parent.parent
 DLINE_DIR = ROOT / "dline"
@@ -22,9 +27,6 @@ sys.path.insert(0, str(DLINE_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dline.app import load_model, predict, train_and_save
-from dline.stand import CSNStand, Type
-from dline.realtimeRollingZScore import RealtimeRollingZScore
-from dline.includedSelfZScoreRestorer import IncludedSelfZScoreRestorerFixed
 from binanace.future.future_klines import fetch_klines
 from decimal import Decimal, ROUND_FLOOR
 
@@ -38,11 +40,13 @@ PRED_LEN = 3          # 预测未来 5 根 K 线
 EPOCHS = 100
 PER_EPOCHS = 10
 TRADE_FEE_RATE = 0.0005
-STOP_MARKET_RATE = 0.04
+STOP_MARKET_RATE = 0.05
 PROFIT_MARKET_RATE=0.02
+SEED=38
+
 LABEL = "future_rtz"
 MODEL_NAME = (
-    str(LIMIT) + "_" + INTERVAL + "_" + str(EPOCHS) + "_" + str(PER_EPOCHS)
+    str(LIMIT) + "_" +str(SEED)+"_"+ INTERVAL + "_" + str(EPOCHS) + "_" + str(PER_EPOCHS)
     + "_" + str(SEQ_LEN) + "_" + str(PRED_LEN) + "_" + str(TRADE_FEE_RATE)
     + "_" + LABEL + "_" + "model.pt"
 )
@@ -59,67 +63,9 @@ PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 MONEY = 0
 CLEAR_MONEY = 0
 PRICE=0
-
-def apply_realtime_rolling_zscore(df, window_size, key):
-    """用 RealtimeRollingZScore 对 df[key] 做包含自身的滚动 Z-Score，写入 keyScaled。"""
-    rt = RealtimeRollingZScore(window=window_size)
-    scaled = []
-    for value in df[key].to_numpy():
-        zscore = rt.update(float(value))
-        scaled.append(np.nan if zscore is None else zscore)
-    df[key + "Scaled"] = scaled
-    return df
-
-
-def apply_log_realtime_zscore(df, window_size, key):
-    """log1p 后再用 RealtimeRollingZScore，写入 keyLogScaled（对应原 LOGZSCOREStand）。"""
-    rt = RealtimeRollingZScore(window=window_size)
-    scaled = []
-    for value in np.log1p(df[key].to_numpy(dtype=np.float64)):
-        zscore = rt.update(float(value))
-        scaled.append(np.nan if zscore is None else zscore)
-    df[key + "LogScaled"] = scaled
-    return df
-
-
-def stand_features(kline_df):
-    kline_df["date"] = pd.to_datetime(kline_df["date"])
-    for key in ("open", "high", "low", "close"):
-        apply_realtime_rolling_zscore(kline_df, WINDOW_SIZE, key)
-    CSNStand(kline_df, Type.MONTH, "date")
-    CSNStand(kline_df, Type.DAY, "date")
-    CSNStand(kline_df, Type.HOUR, "date")
-    apply_log_realtime_zscore(kline_df, WINDOW_SIZE, "volume")
-    kline_df.drop(kline_df.index[0:WINDOW_SIZE], inplace=True)
-    kline_df.reset_index(drop=True, inplace=True)
-    return kline_df
-
-
-def restore_predictions_included_self(predictions, raw_df, window_size, price_keys):
-    pred_len = predictions.shape[0]
-    result = {key: np.zeros(pred_len) for key in price_keys}
-    restorers = {}
-    for key in price_keys:
-        restorer = IncludedSelfZScoreRestorerFixed(window=window_size)
-        history = raw_df[key].to_numpy(dtype=np.float64)[-(window_size - 1):]
-        for price in history:
-            restorer.push_history(float(price))
-        restorers[key] = restorer
-
-    for day in range(pred_len):
-        for key, feat_idx in price_keys.items():
-            zscore = float(predictions[day, feat_idx])
-            try:
-                ori_value = restorers[key].restore_today_value(zscore)
-            except ValueError:
-                ori_value = None
-            if ori_value is None:
-                ori_value = restorers[key].history_window[-1]
-            result[key][day] = ori_value
-            restorers[key].push_history(float(ori_value))
-    return result
-
-
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
 def simBTC():
     global MONEY, CLEAR_MONEY  # 提到函数最顶部声明
 
@@ -131,7 +77,7 @@ def simBTC():
     print(kline_df.tail(3))
 
     # 2. 特征标准化
-    stand_features(kline_df)
+    stand_features(kline_df,WINDOW_SIZE)
     data_np = kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
     train_data = data_np
     print(f"训练样本数: {len(train_data)}, 输入窗口: {train_data.shape}")
@@ -158,7 +104,7 @@ def simBTC():
         time.sleep(0.1)
         kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(end_time.timestamp()) * 1000)
         raw_data = kline_df.copy()
-        stand_features(kline_df)
+        stand_features(kline_df,WINDOW_SIZE)
         data_np = kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
         train_data = data_np
         train_and_save(
@@ -183,16 +129,7 @@ def simBTC():
         # 获取到的变动数量统一强制转为 Decimal
         change_quant = Decimal(str(get_ori_change_quant(kline_df, quant, restored)))
         current_close = Decimal(str(kline_df["close"].to_numpy()[-1]))
-        stop_change_quant,stop_price=stop_market(kline_df,quant)
-        if stop_change_quant!=0:
-            quant=quant+stop_change_quant
-            MONEY = MONEY - stop_change_quant * stop_price
-            PRICE=stop_price
-            if stop_change_quant <= 0:
-                CLEAR_MONEY = CLEAR_MONEY - stop_change_quant * (Decimal('1') - Decimal(str(TRADE_FEE_RATE))) * stop_price
-            else:
-                CLEAR_MONEY = CLEAR_MONEY - stop_change_quant * (Decimal('1') + Decimal(str(TRADE_FEE_RATE))) * stop_price
-        elif change_quant != 0:
+        if change_quant != 0:
             quant = quant + change_quant
             PRICE=current_close
             MONEY = MONEY - change_quant * current_close
@@ -227,11 +164,11 @@ def simBTC():
 
     control_history = pd.DataFrame(control_history)
     control_history.to_csv(
-        f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_change_history.csv"
+        f"./{LIMIT}_{SEED}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_change_history.csv"
     )
     money_df = pd.DataFrame(money_list)
     money_df.to_csv(
-        f"./{LIMIT}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_money.csv"
+        f"./{LIMIT}_{SEED}_{INTERVAL}_{EPOCHS}_{PER_EPOCHS}_{SEQ_LEN}_{PRED_LEN}_{TRADE_FEE_RATE}_{LABEL}_money.csv"
     )
 
 
