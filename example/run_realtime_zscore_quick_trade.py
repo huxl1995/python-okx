@@ -283,45 +283,24 @@ def quick_trade(quant,price,take_profit_rate,stop_lose_rate,start_time):
         return 0,0
     end_time=start_time+timedelta(hours=24)
     end_time=end_time-timedelta(seconds=60)
-    kline=fetch_klines(symbol=SYMBOL,interval='1m',start_time=int(start_time.timestamp())*1000,end_time=int(end_time.timestamp())*1000)
+    kline=fetch_klines(symbol=SYMBOL,interval='1m',limit=1500,start_time=int(start_time.timestamp())*1000,end_time=int(end_time.timestamp())*1000)
     if quant>0:
         take_profit_price=price*Decimal(1+take_profit_rate)
         stop_lose_price=price*Decimal(1-stop_lose_rate);
         for row in kline.itertuples():
-            if row.high>=take_profit_price:
-                return 0,quant*take_profit_price
-            elif row.low<=stop_lose_price:
-                return 0,quant*stop_lose_price
-        return quant,0
-    else:
-        take_profit_rate=price*Decimal(1-take_profit_rate)
-        stop_lose_rate=price*Decimal(1+stop_lose_rate)
-        for row in kline.itertuples():
-            if row.high>=stop_lose_rate:
-                return 0,quant*stop_lose_rate
-            elif row.low<=take_profit_rate:
-                return 0,quant*take_profit_rate
-        return quant,0
-
-def quick_trade(quant,price,take_profit_rate,stop_lose_rate,start_time):
-    if quant ==0:
-        return 0,0
-    start_time=start_time+timedelta(hours=4)
-    end_time=start_time+timedelta(hours=4)
-    end_time=end_time-timedelta(minutes=1)
-    kline=fetch_klines(symbol=SYMBOL,interval='1m',limit=1000,start_time=int(start_time.timestamp())*1000,end_time=int(end_time.timestamp())*1000)
-    if quant>0:
-        take_profit_price=price*Decimal(1+take_profit_rate)
-        for row in kline.itertuples():
+            # if row.low<=stop_lose_price:
+            #     return 0,quant*stop_lose_price
             if row.high>=take_profit_price:
                 return 0,quant*take_profit_price
         return quant,0
     else:
-        take_profit_rate=price*Decimal(1-take_profit_rate)
+        take_profit_price=price*Decimal(1-take_profit_rate)
+        stop_lose_price=price*Decimal(1+stop_lose_rate)
         for row in kline.itertuples():
-            if row.low<=take_profit_rate:
-                return 0,quant*take_profit_rate
+            # if row.high>=stop_lose_price:
+            #     return 0,quant*stop_lose_price
+            if row.low<=take_profit_price:
+                return 0,quant*take_profit_price
         return quant,0
-
 if __name__=='__main__':
     simBTC()
