@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # 读取数据
-df = pd.read_csv('30_1d_30_5_6_3_0.0005_future_quick_trade_money1.csv')
-df1 = pd.read_csv('30_1d_30_5_6_3_0.0005_future_quick_trade_money1.csv')
+df = pd.read_csv('150_38_12h_100_10_30_3_0.0005_future_rtz_money.csv')
+df1 = pd.read_csv('save/model9/150_38_12h_100_10_30_3_0.0005_future_rtz_money.csv')
 
 
 def plot_with_hover(data, title):

@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 # 1. 读取数据并按日期去重（保留每天最后一条记录）
-df = pd.read_csv('30_1d_30_5_6_3_0.0005_future_quick_trade_money1.csv')
+df = pd.read_csv('150_38_12h_100_10_30_3_0.0005_future_rtz_money.csv')
 df = df.drop_duplicates(subset=['date'], keep='last').reset_index(drop=True)
 
 # 2. 设置初始本金与年化天数（重要：请替换为你的实际回测初始本金）
