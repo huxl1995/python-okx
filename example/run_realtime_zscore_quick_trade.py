@@ -40,7 +40,7 @@ PER_EPOCHS = 5
 TRADE_FEE_RATE = 0.0005
 STOP_MARKET_RATE = 0.02
 PROFIT_MARKET_RATE=0.01
-SEED=38
+SEED=39
 
 LABEL = "future_quick_trade"
 MODEL_NAME = (
@@ -281,6 +281,7 @@ def stop_market(kline_df, quant):
 def quick_trade(quant,price,take_profit_rate,stop_lose_rate,start_time):
     if quant ==0:
         return 0,0
+    start_time=start_time+timedelta(hours=24)
     end_time=start_time+timedelta(hours=24)
     end_time=end_time-timedelta(seconds=60)
     kline=fetch_klines(symbol=SYMBOL,interval='1m',limit=1500,start_time=int(start_time.timestamp())*1000,end_time=int(end_time.timestamp())*1000)
@@ -288,8 +289,8 @@ def quick_trade(quant,price,take_profit_rate,stop_lose_rate,start_time):
         take_profit_price=price*Decimal(1+take_profit_rate)
         stop_lose_price=price*Decimal(1-stop_lose_rate);
         for row in kline.itertuples():
-            # if row.low<=stop_lose_price:
-            #     return 0,quant*stop_lose_price
+            if row.low<=stop_lose_price:
+                return 0,quant*stop_lose_price
             if row.high>=take_profit_price:
                 return 0,quant*take_profit_price
         return quant,0
@@ -297,8 +298,8 @@ def quick_trade(quant,price,take_profit_rate,stop_lose_rate,start_time):
         take_profit_price=price*Decimal(1-take_profit_rate)
         stop_lose_price=price*Decimal(1+stop_lose_rate)
         for row in kline.itertuples():
-            # if row.high>=stop_lose_price:
-            #     return 0,quant*stop_lose_price
+            if row.high>=stop_lose_price:
+                return 0,quant*stop_lose_price
             if row.low<=take_profit_price:
                 return 0,quant*take_profit_price
         return quant,0
