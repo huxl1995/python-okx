@@ -40,9 +40,11 @@ PER_EPOCHS = 5
 TRADE_FEE_RATE = 0.0005
 STOP_MARKET_RATE = 0.02
 PROFIT_MARKET_RATE=0.01
+SEED=38
+
 LABEL = "future_quick_trade"
 MODEL_NAME = (
-    str(LIMIT) + "_" + INTERVAL + "_" + str(EPOCHS) + "_" + str(PER_EPOCHS)
+    str(LIMIT) + "_"+str(SEED)+"_" + INTERVAL + "_" + str(EPOCHS) + "_" + str(PER_EPOCHS)
     + "_" + str(SEQ_LEN) + "_" + str(PRED_LEN) + "_" + str(TRADE_FEE_RATE)
     + "_" + LABEL + "_" + "model.pt"
 )
@@ -59,7 +61,6 @@ PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 MONEY = 0
 CLEAR_MONEY = 0
 PRICE=0
-SEED=39
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
