@@ -106,7 +106,6 @@ def dojob():
         stop_price = price * (1 + STOP_MARKET_RATE)
         take_profit_price = price * (1 - PROFIT_MARKET_RATE)
         new_algo_order(SYMBOL, "STOP_MARKET", "BUY", round(stop_price, 2))
-        new_algo_order(SYMBOL, "TAKE_PROFIT_MARKET", "BUY", round(take_profit_price, 2))
     elif change_quant > 0:
         cancel_all_open_orders(SYMBOL)
         price=kline_df['close'].to_numpy()[-1]
@@ -116,7 +115,6 @@ def dojob():
         stop_price = price * (1 - STOP_MARKET_RATE)
         take_profit_price = price * (1 + PROFIT_MARKET_RATE)
         new_algo_order(SYMBOL, "STOP_MARKET", "SELL", round(stop_price, 2))
-        new_algo_order(SYMBOL, "TAKE_PROFIT_MARKET", "SELL", round(take_profit_price, 2))
     else:
         print(f"do job once, side is HOLD")
 
@@ -153,48 +151,6 @@ def state3(restored, quant, close_price):
         # 3. 修复原代码兜底直接清仓
         # /加仓的 Bug：在区间内波动时，保持仓位不动
         return Decimal('0')
-
-#
-# def state_clear(restored, quant, close_price):
-#     global CLEAR_MONEY  # 显式声明全局变量
-#     quant = Decimal(str(quant))
-#
-#     # 1. 修复切片问题
-#     min_close = min(restored["close"][0], restored["close"][1], restored["close"][2])
-#     max_close = max(restored["close"][0], restored["close"][1], restored["close"][2])
-#
-#     # 2. 核心逻辑重构
-#     if close_price > max_close:
-#         if quant > 0:
-#             return -1 * quant
-#         elif quant==0:
-#             return (-1*Decimal('100000') / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
-#         else:
-#             return Decimal('0')
-#
-#     elif close_price < min_close:
-#         if quant == 0:
-#             return (Decimal('100000') / Decimal(str(close_price))).quantize(Decimal('0.0001'), ROUND_FLOOR)
-#         elif quant<0:
-#             return -1*quant
-#         else:
-#             return Decimal('0')
-#     else:
-#         return Decimal('0')
-
-def stop_market(kline_df, quant):
-    min_price = float(kline_df["low"].to_numpy()[-1])
-    max_price = float(kline_df["high"].to_numpy()[-1])
-    if quant<0 and Decimal(max_price)>PRICE*Decimal(1+STOP_MARKET_RATE):
-        return quant*-1,PRICE*Decimal(1+STOP_MARKET_RATE)
-    elif quant>0 and Decimal(min_price)<PRICE*Decimal(1-STOP_MARKET_RATE):
-        return quant*-1,PRICE*Decimal(1-STOP_MARKET_RATE)
-    elif quant<0 and Decimal(min_price)<=PRICE*Decimal(1-PROFIT_MARKET_RATE):
-        return quant*-1,PRICE*Decimal(1-PROFIT_MARKET_RATE)
-    elif quant>0 and Decimal(max_price)>=PRICE*Decimal(1+PROFIT_MARKET_RATE):
-        return quant*-1,PRICE*Decimal(1+PROFIT_MARKET_RATE)
-    else:
-        return 0,0
 if __name__ == "__main__":
     schedule.every().day.at("07:59").do(dojob)
     schedule.every().day.at("19:59").do(dojob)
