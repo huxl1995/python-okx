@@ -15,6 +15,8 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
+from dline.data_stand import stand_features, restore_predictions_included_self
+
 ROOT = Path(__file__).resolve().parent.parent
 DLINE_DIR = ROOT / "dline"
 sys.path.insert(0, str(ROOT))
@@ -22,25 +24,22 @@ sys.path.insert(0, str(DLINE_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dline.app import load_model, predict, train_and_save
-from dline.stand import CSNStand, Type
-from dline.realtimeRollingZScore import RealtimeRollingZScore
-from dline.includedSelfZScoreRestorer import IncludedSelfZScoreRestorerFixed
 from binanace.future.future_klines import fetch_klines
 from decimal import Decimal, ROUND_FLOOR
 import random
 import torch
 # ---------- 参数配置 ----------
 SYMBOL = "BTCUSDT"
-INTERVAL = "4h"       # K 线周期: 1m, 5m, 1h, 1d 等
-LIMIT = 50          # 拉取条数（Binance 单次最多 1000）
-SEQ_LEN = 10
+INTERVAL = "1d"       # K 线周期: 1m, 5m, 1h, 1d 等
+LIMIT = 30          # 拉取条数（Binance 单次最多 1000）
+SEQ_LEN = 6
 WINDOW_SIZE = SEQ_LEN      # 滚动 Z-Score 窗口# 输入序列长度（用过去 30 根 K 线）
 PRED_LEN = 3          # 预测未来 5 根 K 线
-EPOCHS = 50
+EPOCHS = 30
 PER_EPOCHS = 5
 TRADE_FEE_RATE = 0.0005
-STOP_MARKET_RATE = 0.04
-PROFIT_MARKET_RATE=0.02
+STOP_MARKET_RATE = 0.02
+PROFIT_MARKET_RATE=0.01
 LABEL = "future_quick_trade"
 MODEL_NAME = (
     str(LIMIT) + "_" + INTERVAL + "_" + str(EPOCHS) + "_" + str(PER_EPOCHS)
@@ -60,82 +59,22 @@ PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 MONEY = 0
 CLEAR_MONEY = 0
 PRICE=0
-SEED=42
+SEED=39
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
-def apply_realtime_rolling_zscore(df, window_size, key):
-    """用 RealtimeRollingZScore 对 df[key] 做包含自身的滚动 Z-Score，写入 keyScaled。"""
-    rt = RealtimeRollingZScore(window=window_size)
-    scaled = []
-    for value in df[key].to_numpy():
-        zscore = rt.update(float(value))
-        scaled.append(np.nan if zscore is None else zscore)
-    df[key + "Scaled"] = scaled
-    return df
-
-
-def apply_log_realtime_zscore(df, window_size, key):
-    """log1p 后再用 RealtimeRollingZScore，写入 keyLogScaled（对应原 LOGZSCOREStand）。"""
-    rt = RealtimeRollingZScore(window=window_size)
-    scaled = []
-    for value in np.log1p(df[key].to_numpy(dtype=np.float64)):
-        zscore = rt.update(float(value))
-        scaled.append(np.nan if zscore is None else zscore)
-    df[key + "LogScaled"] = scaled
-    return df
-
-
-def stand_features(kline_df):
-    kline_df["date"] = pd.to_datetime(kline_df["date"])
-    for key in ("open", "high", "low", "close"):
-        apply_realtime_rolling_zscore(kline_df, WINDOW_SIZE, key)
-    CSNStand(kline_df, Type.MONTH, "date")
-    CSNStand(kline_df, Type.DAY, "date")
-    CSNStand(kline_df, Type.HOUR, "date")
-    apply_log_realtime_zscore(kline_df, WINDOW_SIZE, "volume")
-    kline_df.drop(kline_df.index[0:WINDOW_SIZE], inplace=True)
-    kline_df.reset_index(drop=True, inplace=True)
-    return kline_df
-
-
-def restore_predictions_included_self(predictions, raw_df, window_size, price_keys):
-    pred_len = predictions.shape[0]
-    result = {key: np.zeros(pred_len) for key in price_keys}
-    restorers = {}
-    for key in price_keys:
-        restorer = IncludedSelfZScoreRestorerFixed(window=window_size)
-        history = raw_df[key].to_numpy(dtype=np.float64)[-(window_size - 1):]
-        for price in history:
-            restorer.push_history(float(price))
-        restorers[key] = restorer
-
-    for day in range(pred_len):
-        for key, feat_idx in price_keys.items():
-            zscore = float(predictions[day, feat_idx])
-            try:
-                ori_value = restorers[key].restore_today_value(zscore)
-            except ValueError:
-                ori_value = None
-            if ori_value is None:
-                ori_value = restorers[key].history_window[-1]
-            result[key][day] = ori_value
-            restorers[key].push_history(float(ori_value))
-    return result
-
-
 def simBTC():
     global MONEY, CLEAR_MONEY  # 提到函数最顶部声明
 
     # 1. 从 Binance 拉取 K 线
     print(f"拉取 {SYMBOL} {INTERVAL} K 线，limit={LIMIT} ...")
-    end_time = datetime(2025, 1, 20, 0, 0, 0)
+    end_time = datetime(2025, 1, 20, 8, 0, 0)
     kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(end_time.timestamp()) * 1000)
     raw_data = kline_df.copy()
     print(kline_df.tail(3))
 
     # 2. 特征标准化
-    stand_features(kline_df)
+    stand_features(kline_df,WINDOW_SIZE)
     data_np = kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
     train_data = data_np
     print(f"训练样本数: {len(train_data)}, 输入窗口: {train_data.shape}")
@@ -156,13 +95,13 @@ def simBTC():
     quant = Decimal('0')
     money_list = []
     control_history = []
-    end_time = datetime(2025, 1, 20, 0, 0, 0)
+    end_time = datetime(2025, 1, 20, 8, 0, 0)
     money_list.append({"date": end_time, "money": 0, "clear_money": 0})
     while end_time < datetime.now():
         time.sleep(0.1)
         kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(end_time.timestamp()) * 1000)
         raw_data = kline_df.copy()
-        stand_features(kline_df)
+        stand_features(kline_df,WINDOW_SIZE)
         data_np = kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
         train_data = data_np
         train_and_save(
@@ -220,7 +159,7 @@ def simBTC():
             "money": str(MONEY + quant * current_close),
             "clear_money": str(CLEAR_MONEY + quant * current_close), # 修改原逻辑中误用常规 quant 的问题
         })
-        end_time = end_time + timedelta(hours=4)
+        end_time = end_time + timedelta(hours=24)
         num += 1
 
     control_history = pd.DataFrame(control_history)
@@ -295,7 +234,7 @@ def state3(restored, quant, close_price):
             return Decimal('0')
     else:
         # 3. 修复原代码兜底直接清仓/加仓的 Bug：在区间内波动时，保持仓位不动
-        return Decimal('0')
+        return quant*-1
 
 #
 # def state_clear(restored, quant, close_price):
@@ -341,9 +280,9 @@ def stop_market(kline_df, quant):
 def quick_trade(quant,price,take_profit_rate,stop_lose_rate,start_time):
     if quant ==0:
         return 0,0
-    end_time=start_time+timedelta(hours=4)
-    end_time=end_time-timedelta(seconds=15)
-    kline=fetch_klines(symbol=SYMBOL,interval='1m',limit=1000,start_time=int(start_time.timestamp())*1000,end_time=int(end_time.timestamp())*1000)
+    end_time=start_time+timedelta(hours=24)
+    end_time=end_time-timedelta(seconds=60)
+    kline=fetch_klines(symbol=SYMBOL,interval='1m',start_time=int(start_time.timestamp())*1000,end_time=int(end_time.timestamp())*1000)
     if quant>0:
         take_profit_price=price*Decimal(1+take_profit_rate)
         stop_lose_price=price*Decimal(1-stop_lose_rate);
@@ -372,20 +311,14 @@ def quick_trade(quant,price,take_profit_rate,stop_lose_rate,start_time):
     kline=fetch_klines(symbol=SYMBOL,interval='1m',limit=1000,start_time=int(start_time.timestamp())*1000,end_time=int(end_time.timestamp())*1000)
     if quant>0:
         take_profit_price=price*Decimal(1+take_profit_rate)
-        stop_lose_price=price*Decimal(1-stop_lose_rate);
         for row in kline.itertuples():
             if row.high>=take_profit_price:
                 return 0,quant*take_profit_price
-            elif row.low<=stop_lose_price:
-                return 0,quant*stop_lose_price
         return quant,0
     else:
         take_profit_rate=price*Decimal(1-take_profit_rate)
-        stop_lose_rate=price*Decimal(1+stop_lose_rate)
         for row in kline.itertuples():
-            if row.high>=stop_lose_rate:
-                return 0,quant*stop_lose_rate
-            elif row.low<=take_profit_rate:
+            if row.low<=take_profit_rate:
                 return 0,quant*take_profit_rate
         return quant,0
 
