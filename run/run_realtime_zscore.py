@@ -10,15 +10,18 @@ import sys
 import time
 from pathlib import Path
 import shutil
+import random
 
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
 import schedule
+import torch
 
 from binanace.future.account import get_position_amt
-from binanace.future.trade import cancel_all_open_orders, new_limit_order
+from binanace.future.trade import cancel_all_open_orders, new_limit_order, new_algo_order
+from dline.data_stand import stand_features, restore_predictions_included_self
 
 ROOT = Path(__file__).resolve().parent.parent
 DLINE_DIR = ROOT / "dline"
@@ -27,9 +30,6 @@ sys.path.insert(0, str(DLINE_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dline.app import load_model, predict, train_and_save
-from dline.stand import CSNStand, Type
-from dline.realtimeRollingZScore import RealtimeRollingZScore
-from dline.includedSelfZScoreRestorer import IncludedSelfZScoreRestorerFixed
 from binanace.future.future_klines import fetch_klines
 from decimal import Decimal, ROUND_FLOOR
 
@@ -43,11 +43,13 @@ PRED_LEN = 3          # 预测未来 5 根 K 线
 EPOCHS = 100
 PER_EPOCHS = 10
 TRADE_FEE_RATE = 0.0005
-STOP_MARKET_RATE = 0.04
-PROFIT_MARKET_RATE=0.02
+STOP_MARKET_RATE = 0.1
+PROFIT_MARKET_RATE=0.1
+SEED=38
+
 LABEL = "future_rtz"
 MODEL_NAME = (
-    str(LIMIT) + "_" + INTERVAL + "_" + str(EPOCHS) + "_" + str(PER_EPOCHS)
+    str(LIMIT) + "_" +str(SEED)+"_"+ INTERVAL + "_" + str(EPOCHS) + "_" + str(PER_EPOCHS)
     + "_" + str(SEQ_LEN) + "_" + str(PRED_LEN) + "_" + str(TRADE_FEE_RATE)
     + "_" + LABEL + "_" + "model.pt"
 )
@@ -64,73 +66,16 @@ PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 MONEY = 0
 CLEAR_MONEY = 0
 PRICE=0
-
-def apply_realtime_rolling_zscore(df, window_size, key):
-    """用 RealtimeRollingZScore 对 df[key] 做包含自身的滚动 Z-Score，写入 keyScaled。"""
-    rt = RealtimeRollingZScore(window=window_size)
-    scaled = []
-    for value in df[key].to_numpy():
-        zscore = rt.update(float(value))
-        scaled.append(np.nan if zscore is None else zscore)
-    df[key + "Scaled"] = scaled
-    return df
-
-
-def apply_log_realtime_zscore(df, window_size, key):
-    """log1p 后再用 RealtimeRollingZScore，写入 keyLogScaled（对应原 LOGZSCOREStand）。"""
-    rt = RealtimeRollingZScore(window=window_size)
-    scaled = []
-    for value in np.log1p(df[key].to_numpy(dtype=np.float64)):
-        zscore = rt.update(float(value))
-        scaled.append(np.nan if zscore is None else zscore)
-    df[key + "LogScaled"] = scaled
-    return df
-
-
-def stand_features(kline_df):
-    kline_df["date"] = pd.to_datetime(kline_df["date"])
-    for key in ("open", "high", "low", "close"):
-        apply_realtime_rolling_zscore(kline_df, WINDOW_SIZE, key)
-    CSNStand(kline_df, Type.MONTH, "date")
-    CSNStand(kline_df, Type.DAY, "date")
-    CSNStand(kline_df, Type.HOUR, "date")
-    apply_log_realtime_zscore(kline_df, WINDOW_SIZE, "volume")
-    kline_df.drop(kline_df.index[0:WINDOW_SIZE], inplace=True)
-    kline_df.reset_index(drop=True, inplace=True)
-    return kline_df
-
-
-def restore_predictions_included_self(predictions, raw_df, window_size, price_keys):
-    pred_len = predictions.shape[0]
-    result = {key: np.zeros(pred_len) for key in price_keys}
-    restorers = {}
-    for key in price_keys:
-        restorer = IncludedSelfZScoreRestorerFixed(window=window_size)
-        history = raw_df[key].to_numpy(dtype=np.float64)[-(window_size - 1):]
-        for price in history:
-            restorer.push_history(float(price))
-        restorers[key] = restorer
-
-    for day in range(pred_len):
-        for key, feat_idx in price_keys.items():
-            zscore = float(predictions[day, feat_idx])
-            try:
-                ori_value = restorers[key].restore_today_value(zscore)
-            except ValueError:
-                ori_value = None
-            if ori_value is None:
-                ori_value = restorers[key].history_window[-1]
-            result[key][day] = ori_value
-            restorers[key].push_history(float(ori_value))
-    return result
-
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
 
 def dojob():
     global MONEY, CLEAR_MONEY  # 提到函数最顶部声明
     # 将核心持仓量、仓位数据初始化为 Decimal 确保全局运算一致
     kline_df = fetch_klines(symbol=SYMBOL, interval=INTERVAL, limit=LIMIT, end_time=int(datetime.now().timestamp()) * 1000)
     raw_data = kline_df.copy()
-    stand_features(kline_df)
+    stand_features(kline_df,WINDOW_SIZE)
     data_np = kline_df[FEATURE_COLUMNS].to_numpy(dtype=np.float64)
     train_data = data_np
     train_and_save(
@@ -140,7 +85,6 @@ def dojob():
         pred_len=PRED_LEN,
         epochs=PER_EPOCHS,
         log=False,
-        lr=5e-6,
     )
     preData = data_np[-SEQ_LEN:]
     model = load_model(str(MODEL_PATH))
@@ -151,15 +95,28 @@ def dojob():
         WINDOW_SIZE,
         PRICE_KEYS,
     )
-    cancel_all_open_orders(SYMBOL)
     quant = get_position_amt(SYMBOL)    # 获取到的变动数量统一强制转为 Decimal
     change_quant = Decimal(str(get_ori_change_quant(kline_df, quant, restored)))
     if change_quant < 0:
-        new_limit_order(SYMBOL, "SELL", -1*change_quant, kline_df['close'].to_numpy()[-1])
+        cancel_all_open_orders(SYMBOL)
+        price=kline_df['close'].to_numpy()[-1]
+        new_limit_order(SYMBOL, "SELL", -1*change_quant, price)
         print(f"do job once, side is SELL")
+        time.sleep(120)
+        stop_price = price * (1 + STOP_MARKET_RATE)
+        take_profit_price = price * (1 - PROFIT_MARKET_RATE)
+        new_algo_order(SYMBOL, "STOP_MARKET", "BUY", round(stop_price, 2))
+        new_algo_order(SYMBOL, "TAKE_PROFIT_MARKET", "BUY", round(take_profit_price, 2))
     elif change_quant > 0:
-        new_limit_order(SYMBOL, "BUY", change_quant, kline_df['close'].to_numpy()[-1])
+        cancel_all_open_orders(SYMBOL)
+        price=kline_df['close'].to_numpy()[-1]
+        new_limit_order(SYMBOL, "BUY", change_quant, price)
         print(f"do job once, side is BUY")
+        time.sleep(120)
+        stop_price = price * (1 - STOP_MARKET_RATE)
+        take_profit_price = price * (1 + PROFIT_MARKET_RATE)
+        new_algo_order(SYMBOL, "STOP_MARKET", "SELL", round(stop_price, 2))
+        new_algo_order(SYMBOL, "TAKE_PROFIT_MARKET", "SELL", round(take_profit_price, 2))
     else:
         print(f"do job once, side is HOLD")
 
@@ -239,8 +196,8 @@ def stop_market(kline_df, quant):
     else:
         return 0,0
 if __name__ == "__main__":
-    schedule.every().day.at("23:59").do(dojob)
-    schedule.every().day.at("11:59").do(dojob)
+    schedule.every().day.at("07:59").do(dojob)
+    schedule.every().day.at("19:59").do(dojob)
     while True:
         schedule.run_pending()
         time.sleep(1)
