@@ -43,6 +43,13 @@ TRADE_FEE_RATE = 0.0005
 STOP_MARKET_RATE = 0.1
 PROFIT_MARKET_RATE=0.15
 SEED=38
+# 全局变量定义
+MONEY = 0
+CLEAR_MONEY = 0
+PRICE=0
+CURRENT_PRICE=0
+STOP_MARKET_PRICE=0
+PROFIT_MARKET_PRICE=0
 
 LABEL = "future_rtz"
 MODEL_NAME = (
@@ -59,10 +66,7 @@ FEATURE_COLUMNS = [
 ]
 PRICE_KEYS = {"open": 0, "high": 1, "low": 2, "close": 3}
 
-# 全局变量定义
-MONEY = 0
-CLEAR_MONEY = 0
-PRICE=0
+
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
@@ -125,7 +129,7 @@ def simBTC():
             WINDOW_SIZE,
             PRICE_KEYS,
         )
-        global PRICE
+        global PRICE,CURRENT_PRICE,STOP_MARKET_PRICE,PROFIT_MARKET_PRICE
         stop_change_quant, stop_price = stop_market(kline_df, quant)
         if stop_change_quant != 0:
             quant = quant + stop_change_quant
@@ -140,15 +144,21 @@ def simBTC():
         # 获取到的变动数量统一强制转为 Decimal
         change_quant = Decimal(str(get_ori_change_quant(kline_df, quant, restored)))
         current_close = Decimal(str(kline_df["close"].to_numpy()[-1]))
+        CURRENT_PRICE=current_close
         if change_quant != 0:
             quant = quant + change_quant
             PRICE=current_close
+            CURRENT_PRICE = current_close
             MONEY = MONEY - change_quant * current_close
             # 修复原逻辑中 clear_change_quant 误加到常规 change_quant 的逻辑隐患
             if change_quant <= 0:
                 CLEAR_MONEY = CLEAR_MONEY - change_quant * (Decimal('1') - Decimal(str(TRADE_FEE_RATE))) * current_close
+                STOP_MARKET_PRICE=Decimal(1+STOP_MARKET_RATE)*current_close
+                PROFIT_MARKET_PRICE=Decimal(1-STOP_MARKET_PRICE)*current_close
             else:
                 CLEAR_MONEY = CLEAR_MONEY - change_quant * (Decimal('1') + Decimal(str(TRADE_FEE_RATE))) * current_close
+                STOP_MARKET_PRICE=Decimal(1-STOP_MARKET_RATE)*current_close
+                PROFIT_MARKET_PRICE=Decimal(1+PROFIT_MARKET_RATE)*current_close
         money_str = str(MONEY)
         clear_money_str = str(CLEAR_MONEY)
         print(
@@ -276,17 +286,29 @@ def state3(restored, quant, close_price):
 #         return Decimal('0')
 
 def stop_market(kline_df, quant):
+    global STOP_MARKET_PRICE,PROFIT_MARKET_PRICE
     min_price = float(kline_df["low"].to_numpy()[-1])
     max_price = float(kline_df["high"].to_numpy()[-1])
-    if quant<0 and Decimal(max_price)>PRICE*Decimal(1+STOP_MARKET_RATE):
-        return quant*-1,PRICE*Decimal(1+STOP_MARKET_RATE)
-    elif quant>0 and Decimal(min_price)<PRICE*Decimal(1-STOP_MARKET_RATE):
-        return quant*-1,PRICE*Decimal(1-STOP_MARKET_RATE)
-    elif quant<0 and Decimal(min_price)<=PRICE*Decimal(1-PROFIT_MARKET_RATE):
-        return quant*-1,PRICE*Decimal(1-PROFIT_MARKET_RATE)
-    elif quant>0 and Decimal(max_price)>=PRICE*Decimal(1+PROFIT_MARKET_RATE):
-        return quant*-1,PRICE*Decimal(1+PROFIT_MARKET_RATE)
+    if quant<0 and Decimal(max_price)>STOP_MARKET_PRICE:
+        return quant*-1,STOP_MARKET_PRICE
+    elif quant>0 and Decimal(min_price)<STOP_MARKET_PRICE:
+        return quant*-1,PRICE*STOP_MARKET_PRICE
+    elif quant<0 and Decimal(min_price)<=PROFIT_MARKET_PRICE:
+        return quant*-1,PROFIT_MARKET_PRICE
+    elif quant>0 and Decimal(max_price)>=PROFIT_MARKET_PRICE:
+        return quant*-1,PROFIT_MARKET_PRICE
     else:
+        close_price=Decimal(kline_df["close"].to_numpy()[-1])
+        if quant <0:
+            if close_price*Decimal(1+STOP_MARKET_RATE)<STOP_MARKET_PRICE:
+                STOP_MARKET_PRICE=close_price*Decimal(1+STOP_MARKET_RATE)
+            if close_price*Decimal(1-PROFIT_MARKET_PRICE)<PROFIT_MARKET_PRICE:
+                PROFIT_MARKET_PRICE=close_price*Decimal(1-PROFIT_MARKET_PRICE)
+        if quant>0:
+            if close_price*Decimal(1-STOP_MARKET_RATE)>STOP_MARKET_PRICE:
+                STOP_MARKET_PRICE=close_price*Decimal(1-STOP_MARKET_RATE)
+            if close_price*Decimal(1+PROFIT_MARKET_RATE)>PROFIT_MARKET_PRICE:
+                PROFIT_MARKET_PRICE=close_price*Decimal(1+PROFIT_MARKET_RATE)
         return 0,0
 if __name__=='__main__':
     simBTC()
