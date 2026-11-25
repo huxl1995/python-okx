@@ -292,7 +292,7 @@ def stop_market(kline_df, quant):
     if quant<0 and Decimal(max_price)>STOP_MARKET_PRICE:
         return quant*-1,STOP_MARKET_PRICE
     elif quant>0 and Decimal(min_price)<STOP_MARKET_PRICE:
-        return quant*-1,PRICE*STOP_MARKET_PRICE
+        return quant*-1,STOP_MARKET_PRICE
     elif quant<0 and Decimal(min_price)<=PROFIT_MARKET_PRICE:
         return quant*-1,PROFIT_MARKET_PRICE
     elif quant>0 and Decimal(max_price)>=PROFIT_MARKET_PRICE:
